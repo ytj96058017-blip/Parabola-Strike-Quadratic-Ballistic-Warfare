@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파라볼라 스트라이크: 2차함수 탄도 포격전 - 중3 수학 4인 실시간 협동 배틀</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Jua', 'Inter', sans-serif; }
+        .font-military { font-family: 'Orbitron', 'Black Han Sans', sans-serif; }
+        .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+        
+        .radar-grid-bg {
+            background-color: #020907;
+            background-image: 
+                linear-gradient(rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+                radial-gradient(circle at 50% 15%, #064e3b 0%, #020907 80%);
+            background-size: 32px 32px, 32px 32px, 100% 100%;
+        }
+
+        .neon-border-emerald {
+            border: 2px solid #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.35), inset 0 0 15px rgba(16, 185, 129, 0.15);
+        }
+
+        .neon-border-amber {
+            border: 2px solid #f59e0b;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.35), inset 0 0 15px rgba(245, 158, 11, 0.15);
+        }
+
+        .hud-corner {
+            position: relative;
+        }
+        .hud-corner::before, .hud-corner::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-color: #34d399;
+            pointer-events: none;
+        }
+        .hud-corner::before { top: -2px; left: -2px; border-top: 3px solid; border-left: 3px solid; }
+        .hud-corner::after { bottom: -2px; right: -2px; border-bottom: 3px solid; border-right: 3px solid; }
+
+        @keyframes barrelHeatGlow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.6)); }
+            50% { filter: drop-shadow(0 0 30px rgba(16, 185, 129, 0.95)) drop-shadow(0 0 50px rgba(52, 211, 153, 0.5)); }
+        }
+        .barrel-pulse {
+            animation: barrelHeatGlow 2.4s infinite ease-in-out;
+        }
+
+        @keyframes dangerAlert {
+            from { border-color: #ef4444; background-color: rgba(239, 68, 68, 0.3); }
+            to { border-color: #f59e0b; background-color: rgba(245, 158, 11, 0.4); }
+        }
+        .danger-siren {
+            animation: dangerAlert 0.75s infinite alternate;
+        }
+
+        .radar-text {
+            text-shadow: 0 0 10px rgba(52, 211, 153, 0.8), 2px 2px #065f46;
+        }
+    </style>
+</head>
+<body class="radar-grid-bg text-white min-h-screen flex flex-col justify-between p-2 md:p-5 select-none relative overflow-x-hidden">
+
+    <!-- Top Tactical Status Bar -->
+    <div class="max-w-6xl w-full mx-auto flex items-center justify-between text-[11px] font-mono-code text-emerald-400 border-b border-emerald-500/30 pb-1.5 mb-2">
+        <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span class="font-bold tracking-widest text-emerald-300">BALLISTIC_TELEMETRY: ONLINE</span>
+            <span class="text-slate-600">|</span>
+            <span class="hidden sm:inline text-slate-400">TRAJECTORY: y = a(x - p)² + q</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-yellow-300 font-bold">FIRE_CONTROL: LOCKED</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300">GRID_SECURE</span>
+        </div>
+    </div>
+
+    <!-- Header Banner -->
+    <header class="text-center mb-3">
+        <div class="flex items-center justify-center gap-3">
+            <span class="text-3xl md:text-4xl">🎯</span>
+            <h1 class="text-3xl md:text-5xl font-military tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-300 radar-text font-black">
+                PARABOLA STRIKE
+            </h1>
+            <span class="text-3xl md:text-4xl">🚀</span>
+        </div>
+        <p class="text-xs md:text-sm text-emerald-300/90 mt-1 font-mono-code tracking-wide">
+            [중3 함수] 이차함수 표준형 $y = a(x-p)^2 + q$ · 꼭짓점 $(p, q)$ · 탄착점 $x$절편 · 4인 실시간 탄도 포격전
+        </p>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="max-w-6xl w-full mx-auto flex-1 flex flex-col justify-center gap-3">
+
+        <!-- 1. Lobby Screen -->
+        <div id="lobby-screen" class="bg-slate-950/90 neon-border-emerald rounded-3xl p-6 md:p-10 shadow-2xl backdrop-blur-xl hud-corner">
+            <div class="text-center mb-8">
+                <div class="inline-block px-4 py-1 rounded-full bg-emerald-950 border border-emerald-400/50 text-emerald-300 text-xs font-mono-code font-bold mb-2 tracking-widest">
+                    // TACTICAL ARTILLERY COMMAND CONSOLE //
+                </div>
+                <h2 class="text-2xl md:text-3xl font-military text-emerald-300 mb-2">포병 포대원 배치 등록</h2>
+                <p class="text-xs md:text-sm text-slate-300">
+                    배틀룸 코드를 공유한 전우들과 팀을 이뤄 이차함수 탄도 궤적을 계산하고 상대 요새를 먼저 궤멸시키세요!
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                <div class="bg-slate-900/90 p-5 rounded-2xl border border-emerald-500/40">
+                    <label class="block text-sm font-semibold mb-2 text-emerald-300 flex items-center gap-2">
+                        <span>👤</span> 탄도 포병관 닉네임
+                    </label>
+                    <input type="text" id="player-name" placeholder="예: 탄도명사수 태호" maxlength="10"
+                           class="w-full px-4 py-3 rounded-xl bg-slate-950 border-2 border-slate-700 text-white font-bold text-lg focus:outline-none focus:border-emerald-400 font-mono-code">
+                </div>
+                <div class="bg-slate-900/90 p-5 rounded-2xl border border-emerald-500/40">
+                    <label class="block text-sm font-semibold mb-2 text-emerald-300 flex items-center gap-2">
+                        <span>🔑</span> 배틀룸 코드 (방 비밀번호)
+                    </label>
+                    <input type="text" id="room-code" placeholder="예: strike301" maxlength="12"
+                           class="w-full px-4 py-3 rounded-xl bg-slate-950 border-2 border-slate-700 text-white font-bold text-lg focus:outline-none focus:border-emerald-400 font-mono-code">
+                </div>
+            </div>
+
+            <!-- Team Select Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                <button onclick="joinTeam('blue')" class="group relative py-5 rounded-2xl font-military text-xl bg-gradient-to-r from-teal-800 to-emerald-700 hover:from-teal-700 hover:to-emerald-600 transition-all duration-200 shadow-xl border-2 border-emerald-300 flex items-center justify-center gap-3 transform hover:-translate-y-1 active:scale-95">
+                    <span class="text-3xl">🔵</span>
+                    <span class="tracking-wide">알파 포대 (블루 발사대) 배치</span>
+                </button>
+                <button onclick="joinTeam('red')" class="group relative py-5 rounded-2xl font-military text-xl bg-gradient-to-r from-amber-800 to-rose-700 hover:from-amber-700 hover:to-rose-600 transition-all duration-200 shadow-xl border-2 border-amber-400 flex items-center justify-center gap-3 transform hover:-translate-y-1 active:scale-95">
+                    <span class="text-3xl">🔴</span>
+                    <span class="tracking-wide">브라보 포대 (레드 발사대) 배치</span>
+                </button>
+            </div>
+
+            <!-- Lobby Reset Button -->
+            <div class="flex justify-center mb-4">
+                <button onclick="resetCurrentRoomData()" class="px-4 py-2 bg-rose-950/90 hover:bg-rose-900 border border-rose-500/70 rounded-xl text-xs text-rose-300 font-bold transition flex items-center gap-2 shadow font-mono-code">
+                    <span>🧹</span><span>로비 포대원 명단 초기화 (유령 정리)</span>
+                </button>
+            </div>
+
+            <div id="lobby-status" class="text-center text-sm text-emerald-300 font-bold min-h-[24px]">
+                포대를 선택하면 탄도 컴퓨터를 동기화하고 전장으로 전개합니다!
+            </div>
+            
+            <div class="mt-5 text-center text-xs text-teal-300 font-mono-code font-bold">
+                🔥 클라우드 DB 연결 상태: <span id="db-status-badge">확인 중...</span>
+            </div>
+        </div>
+
+        <!-- 2. Battle Screen -->
+        <div id="battle-screen" class="hidden flex flex-col gap-3">
+            
+            <!-- Quick Reset Bar for Ghost Cleanup -->
+            <div class="flex items-center justify-between px-1">
+                <div class="flex items-center gap-2 text-xs font-mono-code text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>LIVE_OPERATION // 4-STAGE BALLISTIC INTERLOCK</span>
+                </div>
+                <button onclick="resetCurrentRoomData()" class="px-3 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/60 rounded-xl text-xs text-rose-300 font-bold transition active:scale-95 shadow flex items-center gap-1.5 font-mono-code">
+                    <span>🧹</span><span>포대원 명단 리셋 (0명 청소)</span>
+                </button>
+            </div>
+
+            <!-- Fortress HP HUD -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-950/90 p-3.5 rounded-2xl border border-slate-800 shadow-xl hud-corner">
+                <!-- Blue Artillery Fortress -->
+                <div class="flex flex-col gap-2 p-3 rounded-xl bg-teal-950/40 border-2 border-emerald-500/60">
+                    <div class="flex justify-between items-center text-sm font-bold">
+                        <span class="text-emerald-300 font-military text-base md:text-lg flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                            <span>알파 요새 벙커</span>
+                        </span>
+                        <span id="blue-hp-text" class="text-emerald-300 font-mono-code text-base font-bold">100 / 100 HP</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-3.5 overflow-hidden border border-emerald-500/60 relative">
+                        <div id="blue-hp-bar" class="bg-gradient-to-r from-emerald-600 via-teal-400 to-cyan-300 h-full transition-all duration-300 shadow-[0_0_10px_#10b981]" style="width: 100%;"></div>
+                    </div>
+                    <div id="blue-members" class="text-xs text-emerald-200 font-mono-code truncate">포대원: 대기 중...</div>
+                </div>
+
+                <!-- Red Artillery Fortress -->
+                <div class="flex flex-col gap-2 p-3 rounded-xl bg-rose-950/40 border-2 border-rose-500/60">
+                    <div class="flex justify-between items-center text-sm font-bold">
+                        <span class="text-amber-300 font-military text-base md:text-lg flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]"></span>
+                            <span>브라보 요새 벙커</span>
+                        </span>
+                        <span id="red-hp-text" class="text-amber-300 font-mono-code text-base font-bold">100 / 100 HP</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-3.5 overflow-hidden border border-rose-500/60 relative">
+                        <div id="red-hp-bar" class="bg-gradient-to-r from-amber-600 via-rose-500 to-red-400 h-full transition-all duration-300 shadow-[0_0_10px_#f59e0b]" style="width: 100%;"></div>
+                    </div>
+                    <div id="red-members" class="text-xs text-rose-200 font-mono-code truncate">포대원: 대기 중...</div>
+                </div>
+            </div>
+
+            <!-- Ballistic Parabola 2D Canvas Arena -->
+            <div class="relative w-full h-72 md:h-84 bg-slate-950 rounded-3xl border-2 border-emerald-500/60 overflow-hidden shadow-2xl hud-corner">
+                <canvas id="ballistic-canvas" class="w-full h-full block cursor-crosshair"></canvas>
+                
+                <div class="absolute top-2 left-3 px-3 py-1 bg-slate-950/90 border border-emerald-400/60 rounded-full text-xs font-mono-code text-emerald-300 z-10 flex items-center gap-2 shadow">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>APEX_RADAR //</span>
+                    <span id="ballistic-status-label" class="font-bold text-yellow-300">꼭짓점 및 탄도 궤적 산출 대기</span>
+                </div>
+
+                <div class="absolute top-2 right-3 px-3 py-1 bg-slate-950/90 border border-emerald-400/60 rounded-full text-[11px] font-military text-emerald-300 z-10 flex items-center gap-1.5 shadow">
+                    <span>👆 캔버스 터치:</span>
+                    <span class="text-yellow-300">탄도 조준 핑(Ping)</span>
+                </div>
+
+                <!-- Bottom Status Ticker inside Canvas -->
+                <div class="absolute bottom-2 left-3 right-3 px-3 py-1 bg-slate-950/80 border border-slate-800 rounded-xl text-[11px] font-mono-code text-slate-400 flex items-center justify-between">
+                    <span id="canvas-status-stream">> [SYS] 2차함수 탄도학 조준 중... 꼭짓점 (p, q)와 곡률 계수 a 연립 요망</span>
+                    <span class="text-emerald-400 font-bold hidden sm:inline">TRAJECTORY_CALC: 60 FPS</span>
+                </div>
+            </div>
+
+            <!-- Cooperative 4-Step Pipeline Workspace -->
+            <div id="action-box" class="relative bg-slate-950/95 neon-border-emerald rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col items-center text-center barrel-pulse hud-corner">
+                
+                <!-- Smoke Blind Screen Overlay -->
+                <div id="smoke-overlay" class="hidden absolute inset-0 rounded-3xl z-30 flex flex-col items-center justify-center p-6 text-center bg-slate-900/95 backdrop-blur-md">
+                    <span class="text-5xl animate-bounce mb-3">💨</span>
+                    <h4 class="text-2xl font-military text-amber-400 mb-1">상대 포대의 화학 연막탄 피격!</h4>
+                    <p class="text-sm text-slate-200 mb-4">포병 조준경이 연막으로 뒤덮였습니다! 아래 버튼을 연속으로 클릭해 연막을 걷어내세요!</p>
+                    <button onclick="cleanSmoke()" class="px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-300 text-slate-950 font-military text-lg rounded-xl shadow-lg active:scale-95">
+                        🧹 연막 제독 팬 가동 (<span id="smoke-wipe-count">5</span>회 남음)
+                    </button>
+                </div>
+
+                <!-- 5-Second Overheat Lockout Overlay -->
+                <div id="lockout-penalty-box" class="hidden absolute inset-0 bg-slate-950/95 rounded-3xl z-40 flex flex-col items-center justify-center p-6 text-center border-4 border-rose-500 danger-siren backdrop-blur-md">
+                    <span class="text-5xl animate-bounce mb-2">⚠️</span>
+                    <h4 class="text-2xl font-military text-rose-400 mb-1">포신 과열 경보! 긴급 냉각 중</h4>
+                    <p class="text-xs md:text-sm text-slate-200 mb-3">
+                        꼭짓점 좌표 또는 탄도 계수 연산 오류! 무작위 찍기를 방지하기 위해 5초간 사격 통제 콘솔이 잠금 처리됩니다.<br>
+                        포대원들과 $y = a(x - p)^2 + q$ 표준형과 부호를 다시 정밀 검산하세요!
+                    </p>
+                    <div class="px-5 py-2.5 rounded-2xl bg-rose-950 border-2 border-rose-400 font-military text-2xl text-yellow-300 flex items-center gap-2">
+                        <span>⏳ 포신 냉각까지:</span>
+                        <span id="lockout-timer-num" class="text-3xl font-mono text-rose-400">5.0</span>초
+                    </div>
+                </div>
+
+                <!-- Badges -->
+                <div class="flex flex-wrap items-center justify-center gap-2 mb-3">
+                    <span id="my-team-badge" class="text-xs px-3.5 py-1 rounded-full font-bold font-military">소속 포대</span>
+                    <span id="my-role-badge" class="text-xs px-3.5 py-1 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded-full font-bold">내 포지션</span>
+                    <span id="target-fort-badge" class="text-xs px-3.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-full font-bold font-mono-code">
+                        🎯 OPERATION : <span id="current-op-name">BALLISTIC_MISSION_#1</span>
+                    </span>
+                </div>
+
+                <!-- Parabola Quadratic Function Display -->
+                <div class="w-full max-w-3xl bg-slate-900/90 border-2 border-emerald-400/80 rounded-2xl p-3.5 md:p-5 shadow-inner mb-3 hud-corner">
+                    <div class="text-xs font-semibold text-emerald-300 mb-1.5 tracking-wider uppercase flex items-center justify-between px-2 font-mono-code">
+                        <span>[BALLISTIC TELEMETRY // QUADRATIC TRAJECTORY]</span>
+                        <span class="text-teal-300">STATUS: TARGET_LOCKED</span>
+                    </div>
+                    <div id="function-display" class="text-2xl md:text-4xl font-military text-yellow-300 tracking-wider font-mono-code py-1">
+                        y = a(x - p)² + q 탄도 계산 중...
+                    </div>
+                </div>
+
+                <!-- Parabola Component Assembly HUD -->
+                <div class="w-full max-w-2xl bg-slate-900/70 border border-emerald-500/40 rounded-xl p-2.5 mb-3 text-xs font-mono-code">
+                    <div class="text-slate-400 text-[11px] mb-1.5 flex items-center justify-center gap-1">
+                        <span>🧩</span><span>탄도 궤적 표준형 조립기 : y = a(x - p)² + q</span>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 text-sm md:text-base font-bold">
+                        <span class="text-emerald-300">y =</span>
+                        <span id="slot-a" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold transition-all">
+                            a (곡률)
+                        </span>
+                        <span class="text-slate-300">(x - </span>
+                        <span id="slot-p" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold transition-all">
+                            p (축)
+                        </span>
+                        <span class="text-slate-300">)² + </span>
+                        <span id="slot-q" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold transition-all">
+                            q (최고고도)
+                        </span>
+                        <span class="text-slate-500 mx-1">➔</span>
+                        <div id="slot-impact" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold transition-all">
+                            탄착점 x 산출 대기
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Controls -->
+                <div class="w-full max-w-xl flex flex-col items-center gap-2.5">
+                    <div id="step-instruction" class="text-sm md:text-base font-bold text-emerald-200 min-h-[40px] flex items-center justify-center px-2">
+                        단계 안내 로딩 중...
+                    </div>
+
+                    <!-- Number Input Mode (Steps 0, 1, 2) -->
+                    <div id="number-input-control" class="hidden flex flex-col sm:flex-row items-center justify-center gap-2 w-full max-w-md">
+                        <input type="number" id="step-number-input" placeholder="계산값 숫자 입력" 
+                               class="w-full sm:w-48 px-4 py-3 rounded-xl bg-slate-900 border-2 border-emerald-400 text-white font-bold text-xl text-center focus:outline-none focus:ring-2 focus:ring-emerald-300 font-mono-code"
+                               onkeydown="if(event.key==='Enter') submitStep()">
+                        <button id="submit-step-btn" onclick="submitStep()" 
+                                class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-military text-base md:text-lg rounded-xl transition shadow-lg flex items-center justify-center gap-1.5 active:scale-95">
+                            <span>📡</span><span>탄도 제원 입력</span>
+                        </button>
+                    </div>
+
+                    <!-- Step 3 Fire Button (Opens Payload Modal) -->
+                    <div id="fire-payload-control" class="hidden flex flex-col items-center gap-2 w-full max-w-md">
+                        <button onclick="openPayloadModal()" class="w-full py-4 bg-gradient-to-r from-amber-500 via-rose-600 to-red-600 hover:from-amber-400 hover:to-rose-500 text-white font-military text-xl md:text-2xl rounded-2xl shadow-xl border-2 border-yellow-300 active:scale-95 transition animate-pulse flex items-center justify-center gap-2">
+                            <span>🚀</span><span>포물선 탄도 미사일 발사 (FIRE! 💥)</span>
+                        </button>
+                        <span class="text-xs text-amber-200 font-semibold font-mono-code">> 탄도 궤적 계산 완료! 전술 탄두를 선택하여 적 요새를 타격하세요!</span>
+                    </div>
+
+                    <!-- Waiting Notice for Team Members -->
+                    <div id="waiting-notice" class="hidden p-3 rounded-xl bg-slate-950/80 border border-slate-700 text-xs md:text-sm text-emerald-200 font-mono-code">
+                        ⏳ 현재 <span id="current-actor-name" class="font-bold text-yellow-300"></span> 포병관이 탄도 제원을 계산 중입니다. 캔버스를 터치하여 노드 핑을 보내세요!
+                    </div>
+                </div>
+
+                <!-- 4-Stage Pipeline Tracker Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full max-w-3xl mt-4 pt-3 border-t border-slate-800 text-xs font-semibold font-mono-code">
+                    <div id="stage-card-0" class="p-2.5 rounded-xl border transition-all text-slate-400 bg-slate-900/60 border-slate-800">
+                        ① 대칭축 & 꼭짓점
+                    </div>
+                    <div id="stage-card-1" class="p-2.5 rounded-xl border transition-all text-slate-400 bg-slate-900/60 border-slate-800">
+                        ② 곡률 계수 a
+                    </div>
+                    <div id="stage-card-2" class="p-2.5 rounded-xl border transition-all text-slate-400 bg-slate-900/60 border-slate-800">
+                        ③ 탄착점(x절편)
+                    </div>
+                    <div id="stage-card-3" class="p-2.5 rounded-xl border transition-all text-slate-400 bg-slate-900/60 border-slate-800">
+                        ④ 미사일 격발관 🚀
+                    </div>
+                </div>
+
+                <!-- Feedback & Radio -->
+                <div id="battle-feedback" class="text-sm font-bold min-h-[24px] mt-2 font-mono-code"></div>
+
+                <div class="flex flex-wrap items-center justify-center gap-2 mt-2">
+                    <button onclick="sendQuickCheer('꼭짓점은 (p, q), 축은 x = p야! 💡')" class="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 rounded-lg text-xs text-emerald-200 font-mono-code">
+                        💡 꼭짓점 (p, q) 확인!
+                    </button>
+                    <button onclick="sendQuickCheer('a < 0 이면 위로 볼록한 포물선! 📐')" class="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 rounded-lg text-xs text-emerald-200 font-mono-code">
+                        📐 a < 0 위로 볼록!
+                    </button>
+                    <button onclick="sendQuickCheer('탄착점은 y = 0 일 때의 x값이야! 🎯')" class="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 rounded-lg text-xs text-emerald-200 font-mono-code">
+                        🎯 지면 탄착점 y=0 대입!
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Tactical Warhead Selection Modal -->
+    <div id="payload-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border-4 border-emerald-400 rounded-3xl p-6 md:p-8 max-w-xl w-full text-center shadow-[0_0_50px_rgba(16,185,129,0.4)] hud-corner">
+            <div class="text-5xl mb-2">🚀</div>
+            <h4 class="text-2xl md:text-3xl font-military text-emerald-300 mb-1">4단계: 전술 탄두 선택</h4>
+            <p class="text-xs text-slate-300 mb-5">
+                포물선 탄도 궤적 산출 성공! 적 벙커를 궤멸시킬 전술 탄두를 선택하세요!
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <!-- Weapon 1: Bunker Buster -->
+                <button onclick="choosePayload('bunker_buster')" class="group p-4 rounded-2xl bg-gradient-to-b from-rose-950/90 to-slate-950 border-2 border-rose-500 hover:border-yellow-300 flex flex-col items-center gap-2 transition hover:scale-105 active:scale-95 shadow-xl">
+                    <span class="text-4xl">💥</span>
+                    <span class="font-military text-base text-rose-300">벙커 버스터</span>
+                    <span class="text-[11px] text-slate-300 leading-tight">적 요새에 파괴적 타격<br><b class="text-yellow-300">-35 HP 격파</b></span>
+                </button>
+
+                <!-- Weapon 2: Chemical Smoke Shell -->
+                <button onclick="choosePayload('smoke_shell')" class="group p-4 rounded-2xl bg-gradient-to-b from-amber-950/90 to-slate-950 border-2 border-amber-500 hover:border-yellow-300 flex flex-col items-center gap-2 transition hover:scale-105 active:scale-95 shadow-xl">
+                    <span class="text-4xl">💨</span>
+                    <span class="font-military text-base text-amber-300">화학 연막탄</span>
+                    <span class="text-[11px] text-slate-300 leading-tight">적 조준경 연막 차단<br><b class="text-amber-300">-15 HP + 5회 제독</b></span>
+                </button>
+
+                <!-- Weapon 3: Fortress Repair Drone -->
+                <button onclick="choosePayload('fort_repair')" class="group p-4 rounded-2xl bg-gradient-to-b from-emerald-950/90 to-slate-950 border-2 border-emerald-500 hover:border-yellow-300 flex flex-col items-center gap-2 transition hover:scale-105 active:scale-95 shadow-xl">
+                    <span class="text-4xl">🛠️</span>
+                    <span class="font-military text-base text-emerald-300">벙커 긴급 보수</span>
+                    <span class="text-[11px] text-slate-300 leading-tight">아군 요새 성벽 수리<br><b class="text-emerald-400">+25 HP 회복</b></span>
+                </button>
+            </div>
+
+            <button onclick="document.getElementById('payload-modal').classList.add('hidden')" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl font-mono-code">
+                닫기
+            </button>
+        </div>
+    </div>
+
+    <!-- Generic Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border-2 border-emerald-400 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl hud-corner">
+            <h4 id="modal-title" class="text-2xl font-military text-emerald-300 mb-2">포병 사령부 통신</h4>
+            <p id="modal-body" class="text-sm text-slate-200 mb-6">내용</p>
+            <button onclick="closeCustomModal()" class="bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-military px-6 py-2.5 rounded-xl transition shadow-lg hover:scale-105">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-xl hidden flex items-center justify-center z-50 p-4">
+        <div class="relative bg-gradient-to-b from-slate-900 via-teal-950 to-slate-950 border-4 border-emerald-400 rounded-3xl p-6 md:p-8 max-w-lg w-full text-center shadow-[0_0_60px_rgba(16,185,129,0.6)] overflow-hidden hud-corner">
+            <div class="text-6xl md:text-7xl mb-2">🏆</div>
+            <div class="inline-block px-4 py-1 rounded-full bg-emerald-400 text-slate-950 font-military text-xs tracking-wider mb-2">
+                🎯 PARABOLA STRIKE GRAND VICTORY
+            </div>
+            <h3 id="victory-team-title" class="text-3xl md:text-4xl font-military text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-300 mb-3">
+                알파 포대 완승!
+            </h3>
+            <p id="victory-desc" class="text-xs md:text-sm text-emerald-200 mb-5 leading-relaxed">
+                적의 벙커를 완벽한 2차함수 꼭짓점 분석과 포물선 탄도학 포격으로 모두 궤멸시켰습니다!
+            </p>
+
+            <div class="bg-slate-950/80 border border-slate-700 rounded-2xl p-4 mb-6 text-left">
+                <div class="text-xs text-yellow-300 font-bold mb-2 flex items-center gap-1.5">
+                    <span>👑</span> 영웅 포병 관측 포대원
+                </div>
+                <div id="victory-members-list" class="text-sm font-bold text-white mb-3 font-mono-code">
+                    포대원 목록
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center text-xs font-military border-t border-slate-800 pt-3">
+                    <div class="bg-slate-900/80 p-2 rounded-xl">
+                        <span class="text-slate-400 block text-[10px]">요새 포격 결과</span>
+                        <span class="text-emerald-300 text-sm">상대 벙커 완전 파괴</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2 rounded-xl">
+                        <span class="text-slate-400 block text-[10px]">작전 수행 타임</span>
+                        <span id="victory-total-time" class="text-yellow-300 text-sm font-mono-code">00.0초</span>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="location.reload()" class="w-full py-4 bg-gradient-to-r from-emerald-400 via-teal-400 to-amber-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-military text-lg rounded-2xl shadow-xl transform active:scale-95 transition">
+                🎯 새로운 탄도 포격전 재도전
+            </button>
+        </div>
+    </div>
+
+    <!-- Web Audio API Sound Synthesizer -->
+    <script>
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playTone(freq, type, duration, gainVal = 0.15) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+            radarPing() {
+                this.init();
+                this.playTone(880, 'sine', 0.15, 0.2);
+                setTimeout(() => this.playTone(1320, 'sine', 0.25, 0.18), 70);
+            }
+            tacticalPing() {
+                this.init();
+                this.playTone(660, 'sine', 0.15, 0.2);
+                setTimeout(() => this.playTone(990, 'triangle', 0.25, 0.2), 50);
+            }
+            artilleryLaunch() {
+                this.init();
+                this.playTone(150, 'sawtooth', 0.35, 0.4);
+                setTimeout(() => this.playTone(280, 'sine', 0.45, 0.3), 80);
+            }
+            bunkerExplosion() {
+                this.init();
+                this.playTone(95, 'sawtooth', 0.6, 0.45);
+                setTimeout(() => this.playTone(55, 'triangle', 0.7, 0.35), 70);
+            }
+            unlockChirp() {
+                this.init();
+                this.playTone(523.25, 'triangle', 0.12, 0.2);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.2, 0.25), 70);
+                setTimeout(() => this.playTone(1046.50, 'sine', 0.3, 0.2), 140);
+            }
+            success() {
+                this.init();
+                this.playTone(587.33, 'triangle', 0.15, 0.2);
+                setTimeout(() => this.playTone(880.00, 'triangle', 0.25, 0.25), 90);
+            }
+            error() {
+                this.init();
+                this.playTone(190, 'sawtooth', 0.2, 0.25);
+                setTimeout(() => this.playTone(140, 'sawtooth', 0.25, 0.25), 90);
+            }
+            heal() {
+                this.init();
+                [440, 554.37, 659.25, 880].forEach((f, i) => {
+                    setTimeout(() => this.playTone(f, 'sine', 0.15, 0.2), i * 60);
+                });
+            }
+            victoryFanfare() {
+                this.init();
+                const notes = [
+                    { f: 523.25, d: 0.18 },
+                    { f: 659.25, d: 0.18 },
+                    { f: 783.99, d: 0.22 },
+                    { f: 1046.50, d: 0.5 },
+                    { f: 783.99, d: 0.18 },
+                    { f: 1046.50, d: 0.8 }
+                ];
+                let delay = 0;
+                notes.forEach(n => {
+                    setTimeout(() => this.playTone(n.f, 'triangle', n.d, 0.3), delay);
+                    delay += n.d * 1000 + 40;
+                });
+            }
+        }
+        const sfx = new SoundFX();
+    </script>
+
+    <!-- Main Game Logic and Firebase Synchronizer -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyChxrOzoTxFMy_BvkvNZLXAp1oRvN7Fb1g",
+            authDomain: "focus-tower-defense.firebaseapp.com",
+            projectId: "focus-tower-defense",
+            storageBucket: "focus-tower-defense.firebasestorage.app",
+            messagingSenderId: "519329169002",
+            appId: "1:519329169002:web:401534fe04b6ad39131413",
+            measurementId: "G-G2JRKQ2KXY"
+        };
+
+        let db = null;
+        let useFallback = false;
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            const badge = document.getElementById('db-status-badge');
+            if (badge) {
+                badge.innerText = "🟢 클라우드 DB 정상 연결!";
+                badge.className = "text-emerald-400 font-bold font-mono-code";
+            }
+        } catch (e) {
+            useFallback = false;
+            const badge = document.getElementById('db-status-badge');
+            if (badge) {
+                badge.innerText = "🟢 클라우드 DB 연결 (직접 모드)";
+                badge.className = "text-emerald-400 font-bold font-mono-code";
+            }
+        }
+
+        let currentUserName = '';
+        let currentRoomCode = '';
+        let myTeam = '';
+        let myPlayerId = 'p_' + Math.random().toString(36).substring(2, 9);
+        const myJoinedAt = Date.now();
+        let unsubscribeRoom = null;
+        let lastKnownRoomData = null;
+        let heartbeatInterval = null;
+
+        let missionStartTime = Date.now();
+        let prevWasMyTurn = false;
+        let battleEnded = false;
+        let isLockedOut = false;
+        let lockoutTimerInterval = null;
+        const recentProblemsSet = new Set();
+        let smokeWipesRemaining = 5;
+
+        /*
+           중3 수학 핵심 함수: 이차함수 탄도학 생성기
+           - y = a(x - p)^2 + q  (위로 볼록인 탄도학: a < 0, 주로 a = -1 또는 -2)
+           - 꼭짓점 (p, q): 최고 고도 도달 지점 (대칭축 x = p, 최고 높이 q)
+           - 탄착점(지면 y = 0): a(x - p)^2 + q = 0 ➔ (x - p)^2 = -q / a ➔ x = p ± √(-q / a)
+           - 발사대 원점 또는 전방에서 출발하여 적 기지(양의 x축 탄착점)에 도달하도록 자연수/정수 계수 설정
+        */
+        function generateParabolaMission(opIndex = 1) {
+            let mission = null;
+            let attempts = 0;
+
+            while (attempts < 120) {
+                attempts++;
+                const aPool = [-1, -2];
+                const a = aPool[Math.floor(Math.random() * aPool.length)];
+
+                // Choose integer square root k: k = √(-q / a)
+                const k = Math.floor(Math.random() * 4) + 2; // k in 2, 3, 4, 5
+                const q = -a * (k * k); // q is positive, perfectly divisible
+
+                // Axis p chosen so that start point p - k >= 0 and impact p + k is reasonable (<= 14)
+                const p = k + Math.floor(Math.random() * 4) + 1; // p in [k+1, k+4]
+                const impactX = p + k; // Right landing point (x-intercept)
+                const launchX = p - k; // Left origin point
+
+                // Expanded Standard Form Expression
+                const pSignStr = p >= 0 ? `- ${p}` : `+ ${Math.abs(p)}`;
+                const aStr = a === -1 ? "-" : `${a}`;
+                const expr = `y = ${aStr}(x ${pSignStr})² + ${q}`;
+
+                // Step 0: Axis p or Max Height q
+                const askForP = Math.random() < 0.5;
+                const step0Ans = askForP ? p : q;
+                const step0Clue = askForP
+                    ? `탄도 포물선 y = ${aStr}(x ${pSignStr})² + ${q} 의 최고 고도 도달 축인 [ 대칭축 x = p ] 의 값을 구하라!`
+                    : `탄도 포물선 y = ${aStr}(x ${pSignStr})² + ${q} 의 [ 최고 도달 고도 q (꼭짓점의 y좌표) ] 를 구하라!`;
+
+                // Step 1: Curvature coefficient a
+                const step1Ans = a;
+                const step1Clue = `포구 화력 및 탄도 곡률을 결정하는 [ 최고차항 계수 a ] 의 값을 입력하라! (위로 볼록 곡률)`;
+
+                // Step 2: Impact point x (y = 0 landing point)
+                const step2Ans = impactX;
+                const step2Clue = `지면(y = 0)에 포탄이 탄착하는 지점인 [ x절편(더 먼 착탄점 x) ] 의 좌표를 구하라! (발사 시작점: x = ${launchX})`;
+
+                if (!recentProblemsSet.has(expr) || attempts > 100) {
+                    recentProblemsSet.add(expr);
+                    if (recentProblemsSet.size > 40) {
+                        const first = recentProblemsSet.values().next().value;
+                        recentProblemsSet.delete(first);
+                    }
+
+                    mission = {
+                        expr: expr,
+                        a: a,
+                        p: p,
+                        q: q,
+                        k: k,
+                        launchX: launchX,
+                        impactX: impactX,
+                        step0Ans: step0Ans,
+                        step0Clue: step0Clue,
+                        step1Ans: step1Ans,
+                        step1Clue: step1Clue,
+                        step2Ans: step2Ans,
+                        step2Clue: step2Clue,
+                        askForP: askForP
+                    };
+                    break;
+                }
+            }
+
+            if (!mission) {
+                mission = {
+                    expr: "y = -(x - 5)² + 9",
+                    a: -1,
+                    p: 5,
+                    q: 9,
+                    k: 3,
+                    launchX: 2,
+                    impactX: 8,
+                    step0Ans: 5,
+                    step0Clue: "탄도 포물선 y = -(x - 5)² + 9 의 [ 대칭축 x = p ] 의 값을 구하라!",
+                    step1Ans: -1,
+                    step1Clue: "포구 화력 및 탄도 곡률을 결정하는 [ 최고차항 계수 a ] 의 값을 입력하라!",
+                    step2Ans: 8,
+                    step2Clue: "지면(y = 0)에 포탄이 탄착하는 [ x절편(착탄점 x) ] 의 좌표를 구하라! (두 절편: 2, 8)",
+                    askForP: true
+                };
+            }
+            return mission;
+        }
+
+        function triggerLockoutPenalty() {
+            if (isLockedOut) return;
+            isLockedOut = true;
+            sfx.error();
+
+            const lockoutBox = document.getElementById('lockout-penalty-box');
+            const timerEl = document.getElementById('lockout-timer-num');
+            lockoutBox.classList.remove('hidden');
+
+            timerEl.innerText = '5.0';
+
+            if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
+            const startAt = Date.now();
+
+            lockoutTimerInterval = setInterval(() => {
+                const elapsed = Date.now() - startAt;
+                const left = Math.max(0, (5000 - elapsed) / 1000);
+                timerEl.innerText = left.toFixed(1);
+
+                if (left <= 0) {
+                    clearInterval(lockoutTimerInterval);
+                    lockoutTimerInterval = null;
+                    isLockedOut = false;
+                    lockoutBox.classList.add('hidden');
+                    sfx.playTone(520, 'sine', 0.15, 0.2);
+                    showStepFeedback("⚡ [포신 냉각 완료] 사격 통제 콘솔이 정상 복구되었습니다. 신중하게 입력하세요!", false);
+                }
+            }, 100);
+        }
+
+        function cleanMemberList(members = []) {
+            const map = new Map();
+            members.forEach(item => {
+                if (!item) return;
+                const id = item.id || item.name;
+                const name = item.name || item.id || '포병관';
+                const joinedAt = item.joinedAt || Date.now();
+                const lastSeen = item.lastSeen || Date.now();
+                
+                if (!map.has(id)) {
+                    map.set(id, { id, name, joinedAt, lastSeen });
+                }
+            });
+            return Array.from(map.values()).sort((a, b) => 
+                (a.joinedAt || 0) !== (b.joinedAt || 0) ? (a.joinedAt || 0) - (b.joinedAt || 0) : a.name.localeCompare(b.name)
+            );
+        }
+
+        function getStageActorIndex(stage, teamSize, problemCount = 1) {
+            if (teamSize <= 1) return 0;
+            const shift = (Math.max(1, problemCount) - 1) % teamSize;
+            return (stage + shift) % teamSize;
+        }
+
+        function getRoleDescription(memberIndex, teamSize, problemCount = 1) {
+            if (teamSize <= 1) return "올라운드 치프 포병관 (전 구간 단독 관측/사격)";
+            const stageNames = [
+                "① 축 & 꼭짓점 관측병",
+                "② 곡률 계수사",
+                "③ 탄착점 유도사",
+                "④ 미사일 격발관 🚀"
+            ];
+            const myAssignedStages = [];
+            for (let s = 0; s < 4; s++) {
+                if (getStageActorIndex(s, teamSize, problemCount) === memberIndex) {
+                    myAssignedStages.push(stageNames[s]);
+                }
+            }
+            return `${memberIndex + 1}번 포대원 [${myAssignedStages.join(' + ')}]`;
+        }
+
+        function createInitialRoomData() {
+            return {
+                blueHp: 100,
+                redHp: 100,
+                blueMembers: [],
+                redMembers: [],
+                blueStage: 0,
+                redStage: 0,
+                blueProblemCount: 1,
+                redProblemCount: 1,
+                blueMission: generateParabolaMission(1),
+                redMission: generateParabolaMission(1),
+                lastShot: null,
+                lastExplosion: null,
+                lastPing: null,
+                smokeTarget: null,
+                smokeId: 0,
+                updatedAt: Date.now()
+            };
+        }
+
+        window.joinTeam = async function(team) {
+            const name = document.getElementById('player-name').value.trim() || `포병관_${Math.floor(Math.random()*900+100)}`;
+            const code = document.getElementById('room-code').value.trim() || 'strike301';
+
+            currentUserName = name;
+            currentRoomCode = code;
+            myTeam = team;
+
+            const myMemberObj = { id: myPlayerId, name: currentUserName, lastSeen: Date.now(), joinedAt: myJoinedAt };
+
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('battle-screen').classList.remove('hidden');
+            initBallisticCanvas();
+            sfx.radarPing();
+
+            let initialData = createInitialRoomData();
+            if (team === 'blue') initialData.blueMembers = [myMemberObj];
+            else initialData.redMembers = [myMemberObj];
+            applyRoomState(initialData);
+
+            try {
+                if (db) {
+                    const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
+                    startFirestoreListener(roomRef);
+
+                    const snap = await getDoc(roomRef);
+                    let currentData = snap.exists() ? snap.data() : createInitialRoomData();
+                    const listKey = team === 'blue' ? 'blueMembers' : 'redMembers';
+                    let currentList = currentData[listKey] || [];
+                    currentList = currentList.filter(m => (m.id || m.name) !== myPlayerId);
+                    currentList.push(myMemberObj);
+                    currentData[listKey] = cleanMemberList(currentList);
+                    currentData.updatedAt = Date.now();
+
+                    await setDoc(roomRef, currentData, { merge: true });
+                }
+            } catch (err) {
+                console.warn("Parabola strike join error:", err);
+            }
+
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(sendHeartbeat, 3500);
+            window.addEventListener('beforeunload', leaveRoomCleanup);
+        };
+
+        async function sendHeartbeat() {
+            if (!currentRoomCode || !myTeam || !db) return;
+            try {
+                const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
+                const snap = await getDoc(roomRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const listKey = myTeam === 'blue' ? 'blueMembers' : 'redMembers';
+                    let list = data[listKey] || [];
+                    let found = false;
+                    list = list.map(m => {
+                        if ((m.id || m.name) === myPlayerId) {
+                            found = true;
+                            return { ...m, lastSeen: Date.now() };
+                        }
+                        return m;
+                    });
+                    if (!found) {
+                        list.push({ id: myPlayerId, name: currentUserName, lastSeen: Date.now(), joinedAt: myJoinedAt });
+                    }
+                    data[listKey] = cleanMemberList(list);
+                    data.updatedAt = Date.now();
+                    await updateDoc(roomRef, { [listKey]: data[listKey], updatedAt: data.updatedAt });
+                }
+            } catch (e) {}
+        }
+
+        async function leaveRoomCleanup() {
+            if (!currentRoomCode || !myTeam || !db) return;
+            try {
+                const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
+                const snap = await getDoc(roomRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const listKey = myTeam === 'blue' ? 'blueMembers' : 'redMembers';
+                    const filtered = (data[listKey] || []).filter(m => (m.id || m.name) !== myPlayerId);
+                    await updateDoc(roomRef, { [listKey]: filtered, updatedAt: Date.now() });
+                }
+            } catch (e) {}
+        }
+
+        window.resetCurrentRoomData = async function() {
+            const code = currentRoomCode || document.getElementById('room-code').value.trim() || 'strike301';
+            const fresh = createInitialRoomData();
+            const myMemberObj = { id: myPlayerId, name: currentUserName || '포병관', lastSeen: Date.now(), joinedAt: myJoinedAt };
+            if (myTeam === 'blue') fresh.blueMembers = [myMemberObj];
+            else if (myTeam === 'red') fresh.redMembers = [myMemberObj];
+
+            try {
+                if (db) {
+                    const roomRef = doc(db, 'parabola_strike_rooms', code);
+                    await setDoc(roomRef, fresh);
+                }
+            } catch (e) {}
+            applyRoomState(fresh);
+            showCustomModal("초기화 완료", "포병 배틀룸 포대원 명단과 벙커 HP가 깨끗하게 리셋되었습니다!");
+        };
+
+        function startFirestoreListener(roomRef) {
+            if (unsubscribeRoom) unsubscribeRoom();
+            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+                if (!snap.exists()) return;
+                applyRoomState(snap.data());
+            }, (err) => {
+                console.warn("Snapshot error:", err);
+            });
+        }
+
+        function applyRoomState(data) {
+            if (!data) return;
+
+            data.blueMembers = cleanMemberList(data.blueMembers || []);
+            data.redMembers = cleanMemberList(data.redMembers || []);
+            lastKnownRoomData = data;
+
+            if (data.lastShot && (!window.lastObservedShotId || window.lastObservedShotId !== data.lastShot.id)) {
+                window.lastObservedShotId = data.lastShot.id;
+                triggerArtilleryParabola(data.lastShot.fromTeam, data.lastShot.mission, data.lastShot.payloadType);
+            }
+
+            if (data.lastExplosion && (!window.lastObservedExpId || window.lastObservedExpId !== data.lastExplosion.id)) {
+                window.lastObservedExpId = data.lastExplosion.id;
+                triggerFortExplosion(data.lastExplosion.victimTeam);
+            }
+
+            if (data.lastPing && (!window.lastObservedPingId || window.lastObservedPingId !== data.lastPing.id)) {
+                window.lastObservedPingId = data.lastPing.id;
+                if (data.lastPing.team === myTeam) {
+                    addTacticalPing(data.lastPing.x, data.lastPing.y, data.lastPing.sender);
+                }
+            }
+
+            if (data.smokeTarget === myTeam && (!window.lastObservedSmokeId || window.lastObservedSmokeId !== data.smokeId)) {
+                window.lastObservedSmokeId = data.smokeId;
+                activateSmokeCover();
+            }
+
+            updateFortressHUD(data.blueHp, data.redHp);
+
+            const bMembers = (data.blueMembers || []).map(m => m.name || m);
+            const rMembers = (data.redMembers || []).map(m => m.name || m);
+            document.getElementById('blue-members').innerText = `포대원(${bMembers.length}명): ${bMembers.join(', ') || '대기 중'}`;
+            document.getElementById('red-members').innerText = `포대원(${rMembers.length}명): ${rMembers.join(', ') || '대기 중'}`;
+
+            updatePipelineUI(data);
+
+            if ((data.blueHp <= 0 || data.redHp <= 0) && !battleEnded) {
+                battleEnded = true;
+                const winnerTeam = data.redHp <= 0 ? 'blue' : 'red';
+                triggerGrandVictory(winnerTeam, data);
+            }
+        }
+
+        async function syncStateUpdate(nextData) {
+            applyRoomState(nextData);
+            if (!useFallback && db) {
+                try {
+                    const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
+                    await updateDoc(roomRef, nextData);
+                } catch (e) {
+                    useFallback = true;
+                }
+            }
+        }
+
+        function updateFortressHUD(blueHp, redHp) {
+            const bHp = Math.max(0, Math.min(100, blueHp !== undefined ? blueHp : 100));
+            const rHp = Math.max(0, Math.min(100, redHp !== undefined ? redHp : 100));
+
+            document.getElementById('blue-hp-text').innerText = `${bHp} / 100 HP`;
+            document.getElementById('blue-hp-bar').style.width = `${bHp}%`;
+
+            document.getElementById('red-hp-text').innerText = `${rHp} / 100 HP`;
+            document.getElementById('red-hp-bar').style.width = `${rHp}%`;
+        }
+
+        function updatePipelineUI(data) {
+            const team = myTeam;
+            const myRawMembers = team === 'blue' ? (data.blueMembers || []) : (data.redMembers || []);
+            const myMembers = cleanMemberList(myRawMembers);
+            const currentStage = team === 'blue' ? (data.blueStage || 0) : (data.redStage || 0);
+            const currentMission = team === 'blue' ? data.blueMission : data.redMission;
+            const problemCount = team === 'blue' ? (data.blueProblemCount || 1) : (data.redProblemCount || 1);
+
+            if (!currentMission) return;
+
+            document.getElementById('function-display').innerText = currentMission.expr;
+            document.getElementById('current-op-name').innerText = `BALLISTIC_MISSION_#${problemCount}`;
+
+            // Update Parabola Assembly HUD Slots
+            const slotA = document.getElementById('slot-a');
+            const slotP = document.getElementById('slot-p');
+            const slotQ = document.getElementById('slot-q');
+            const slotImpact = document.getElementById('slot-impact');
+
+            // Stage 0: Vertex (p, q)
+            if (currentStage >= 1) {
+                slotP.innerHTML = `<span class="text-emerald-300 font-bold">${currentMission.p}</span>`;
+                slotP.className = "px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-400 text-emerald-300 font-bold shadow-[0_0_8px_#10b981]";
+                slotQ.innerHTML = `<span class="text-emerald-300 font-bold">${currentMission.q}</span>`;
+                slotQ.className = "px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-400 text-emerald-300 font-bold shadow-[0_0_8px_#10b981]";
+            } else {
+                slotP.innerText = "p (축)";
+                slotP.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
+                slotQ.innerText = "q (최고고도)";
+                slotQ.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
+            }
+
+            // Stage 1: Curvature a
+            if (currentStage >= 2) {
+                slotA.innerHTML = `<span class="text-yellow-300 font-bold">${currentMission.a}</span>`;
+                slotA.className = "px-2 py-0.5 rounded bg-amber-950/80 border border-yellow-400 text-yellow-300 font-bold shadow-[0_0_8px_#eab308]";
+            } else {
+                slotA.innerText = "a (곡률)";
+                slotA.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
+            }
+
+            // Stage 2: Landing x-intercept
+            if (currentStage >= 3) {
+                slotImpact.innerHTML = `<span class="text-teal-300 font-bold">탄착점 x = ${currentMission.impactX} (락온!)</span>`;
+                slotImpact.className = "px-2.5 py-1 rounded bg-teal-950 border-2 border-teal-400 text-teal-300 font-bold shadow-[0_0_12px_#14b8a6] animate-pulse";
+            } else {
+                slotImpact.innerText = "탄착점 x 산출 대기";
+                slotImpact.className = "px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
+            }
+
+            const teamBadge = document.getElementById('my-team-badge');
+            if (team === 'blue') {
+                teamBadge.innerText = `🔵 ALPHA BLUE [MISSION #${problemCount}]`;
+                teamBadge.className = 'text-xs px-3.5 py-1 bg-emerald-500/25 text-emerald-300 border border-emerald-400 rounded-full font-bold font-military';
+            } else {
+                teamBadge.innerText = `🔴 BRAVO RED [MISSION #${problemCount}]`;
+                teamBadge.className = 'text-xs px-3.5 py-1 bg-rose-500/25 text-rose-300 border border-rose-400 rounded-full font-bold font-military';
+            }
+
+            const teamSize = Math.max(1, myMembers.length);
+            const myIndex = myMembers.findIndex(m => m.id === myPlayerId || m.name === currentUserName);
+            const activeMemberIndex = getStageActorIndex(currentStage, teamSize, problemCount);
+            const activeMemberObj = myMembers[activeMemberIndex];
+            const activeMemberName = activeMemberObj ? activeMemberObj.name : `${activeMemberIndex + 1}번 포병관`;
+
+            const isMyTurn = (myIndex !== -1) && (myIndex === activeMemberIndex);
+
+            if (isMyTurn && !prevWasMyTurn) {
+                sfx.radarPing();
+            }
+            prevWasMyTurn = isMyTurn;
+
+            const roleBadge = document.getElementById('my-role-badge');
+            if (myIndex !== -1) {
+                roleBadge.innerText = `내 포지션: ${getRoleDescription(myIndex, teamSize, problemCount)}`;
+                roleBadge.className = isMyTurn 
+                    ? 'text-xs px-3.5 py-1 bg-yellow-400 text-slate-950 border-2 border-yellow-300 rounded-full font-military font-bold animate-pulse'
+                    : 'text-xs px-3.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full font-bold font-mono-code';
+            } else {
+                roleBadge.innerText = "사령부 관전 중";
+            }
+
+            const instEl = document.getElementById('step-instruction');
+            const numControls = document.getElementById('number-input-control');
+            const fireControls = document.getElementById('fire-payload-control');
+            const waitingNotice = document.getElementById('waiting-notice');
+            const currentActorEl = document.getElementById('current-actor-name');
+            const stepNumInput = document.getElementById('step-number-input');
+
+            if (currentStage === 0) {
+                instEl.innerText = `【1단계: 꼭짓점/축 관측】 ${currentMission.step0Clue}`;
+            } else if (currentStage === 1) {
+                instEl.innerText = `【2단계: 곡률 계수사】 ${currentMission.step1Clue}`;
+            } else if (currentStage === 2) {
+                instEl.innerText = `【3단계: 탄착점 유도사】 ${currentMission.step2Clue}`;
+            } else if (currentStage === 3) {
+                instEl.innerText = "【4단계: 미사일 격발】 탄도 궤적 100% 산출 완료! 전술 탄두를 선택해 적 요새를 타격하세요!";
+            }
+
+            if (isMyTurn) {
+                waitingNotice.classList.add('hidden');
+                if (currentStage === 3) {
+                    numControls.classList.add('hidden');
+                    fireControls.classList.remove('hidden');
+                } else {
+                    fireControls.classList.add('hidden');
+                    numControls.classList.remove('hidden');
+                    stepNumInput.disabled = false;
+                    stepNumInput.value = '';
+                    stepNumInput.placeholder = currentStage === 0 ? (currentMission.askForP ? "대칭축 p 값 입력" : "최고고도 q 값 입력") : (currentStage === 1 ? "곡률 계수 a 값 입력" : "탄착점 x좌표 입력");
+                    stepNumInput.focus();
+                }
+            } else {
+                numControls.classList.add('hidden');
+                fireControls.classList.add('hidden');
+                waitingNotice.classList.remove('hidden');
+                currentActorEl.innerText = `${activeMemberName} (${activeMemberIndex + 1}번 포병관)`;
+            }
+
+            const stageTitles = [
+                "① 축 & 꼭짓점",
+                "② 곡률 계수 a",
+                "③ 탄착점(x절편)",
+                "④ 미사일 격발 🚀"
+            ];
+
+            for (let s = 0; s < 4; s++) {
+                const card = document.getElementById(`stage-card-${s}`);
+                const stageActorIdx = getStageActorIndex(s, teamSize, problemCount);
+                const stageActorObj = myMembers[stageActorIdx];
+                const stageActorName = stageActorObj ? stageActorObj.name : `${stageActorIdx + 1}번 주자`;
+                const isThisMine = (myIndex === stageActorIdx);
+
+                card.innerHTML = `<div class="font-bold text-xs">${stageTitles[s]}</div>
+                                  <div class="text-[11px] mt-1 ${isThisMine ? 'text-yellow-300 font-bold' : 'text-slate-400'}">담당: ${stageActorName}${isThisMine ? ' (나)' : ''}</div>`;
+
+                if (s === currentStage) {
+                    card.className = "p-2.5 rounded-xl border-2 transition-all bg-yellow-400/20 border-yellow-300 text-yellow-300 font-bold animate-pulse shadow-lg";
+                } else if (s < currentStage) {
+                    card.className = "p-2.5 rounded-xl border transition-all bg-emerald-950/60 border-emerald-500/60 text-emerald-300 font-semibold";
+                } else {
+                    card.className = "p-2.5 rounded-xl border transition-all bg-slate-900/60 border-slate-800 text-slate-500";
+                }
+            }
+        }
+
+        window.submitStep = async function() {
+            if (isLockedOut) return;
+            if (!lastKnownRoomData) return;
+            const inputEl = document.getElementById('step-number-input');
+            const val = parseFloat(inputEl.value.trim());
+
+            if (isNaN(val)) {
+                showStepFeedback("숫자를 입력해 주세요!", true);
+                sfx.error();
+                return;
+            }
+
+            const data = lastKnownRoomData;
+            const currentStage = myTeam === 'blue' ? (data.blueStage || 0) : (data.redStage || 0);
+            const mission = myTeam === 'blue' ? data.blueMission : data.redMission;
+
+            let expected = null;
+            if (currentStage === 0) expected = mission.step0Ans;
+            else if (currentStage === 1) expected = mission.step1Ans;
+            else if (currentStage === 2) expected = mission.step2Ans;
+
+            if (val === expected) {
+                sfx.unlockChirp();
+                const nextData = { ...data };
+                if (myTeam === 'blue') nextData.blueStage = currentStage + 1;
+                else nextData.redStage = currentStage + 1;
+
+                if (currentStage === 0) {
+                    showStepFeedback(`✨ [꼭짓점 제원 = ${val} 산출 완료!] 대칭축 고각 조준선 고정! 2번 계수사 곡률 입력 개시!`, false);
+                } else if (currentStage === 1) {
+                    showStepFeedback(`✨ [곡률 a = ${val} 설정 완료!] 탄도 포물선 폭 계산 완료! 3번 유도사 착탄점 산출 개시!`, false);
+                } else if (currentStage === 2) {
+                    showStepFeedback(`🎯 [탄착점 x = ${val} 락온 완료!] 적 벙커 직격 궤도 확정! 4번 격발관 미사일을 발사하세요!`, false);
+                }
+
+                nextData.updatedAt = Date.now();
+                await syncStateUpdate(nextData);
+            } else {
+                showStepFeedback("❌ 탄도 제원 연산 오류! 표준형 부호를 재확인하세요. (찍기 방지 5초 포신 냉각)", true);
+                triggerLockoutPenalty();
+            }
+        };
+
+        window.openPayloadModal = function() {
+            document.getElementById('payload-modal').classList.remove('hidden');
+        };
+
+        window.choosePayload = async function(payloadType) {
+            document.getElementById('payload-modal').classList.add('hidden');
+            if (!lastKnownRoomData) return;
+            const data = lastKnownRoomData;
+            const enemyTeam = myTeam === 'blue' ? 'red' : 'blue';
+            const mission = myTeam === 'blue' ? data.blueMission : data.redMission;
+
+            sfx.artilleryLaunch();
+            const nextData = { ...data };
+
+            nextData.lastShot = {
+                fromTeam: myTeam,
+                toTeam: enemyTeam,
+                mission: mission,
+                payloadType: payloadType,
+                id: Date.now()
+            };
+
+            let dmg = 0;
+            let heal = 0;
+
+            if (payloadType === 'bunker_buster') {
+                dmg = 35;
+                showStepFeedback("💥 [벙커 버스터 발사!] 포물선을 그리며 적 요새에 치명타 작렬! (-35 HP)", false);
+            } else if (payloadType === 'smoke_shell') {
+                dmg = 15;
+                nextData.smokeTarget = enemyTeam;
+                nextData.smokeId = Date.now();
+                showStepFeedback("💨 [화학 연막탄 발사!] 적 조준경 시야 차단 및 요새 타격! (-15 HP)", false);
+            } else if (payloadType === 'fort_repair') {
+                heal = 25;
+                sfx.heal();
+                showStepFeedback("🛠️ [벙커 긴급 보수!] 아군 방벽을 신속하게 수리 복구했습니다! (+25 HP)", false);
+            }
+
+            setTimeout(async () => {
+                const latest = lastKnownRoomData || nextData;
+                const hitData = { ...latest };
+
+                if (payloadType === 'fort_repair') {
+                    if (myTeam === 'blue') hitData.blueHp = Math.min(100, (hitData.blueHp || 100) + heal);
+                    else hitData.redHp = Math.min(100, (hitData.redHp || 100) + heal);
+                } else {
+                    if (enemyTeam === 'red') hitData.redHp = Math.max(0, (hitData.redHp !== undefined ? hitData.redHp : 100) - dmg);
+                    else hitData.blueHp = Math.max(0, (hitData.blueHp !== undefined ? hitData.blueHp : 100) - dmg);
+                    hitData.lastExplosion = { victimTeam: enemyTeam, id: Date.now() };
+                    sfx.bunkerExplosion();
+                }
+
+                const nextProblemCount = (myTeam === 'blue' ? (hitData.blueProblemCount || 1) : (hitData.redProblemCount || 1)) + 1;
+                const nextMission = generateParabolaMission(nextProblemCount);
+
+                if (myTeam === 'blue') {
+                    hitData.blueStage = 0;
+                    hitData.blueProblemCount = nextProblemCount;
+                    hitData.blueMission = nextMission;
+                } else {
+                    hitData.redStage = 0;
+                    hitData.redProblemCount = nextProblemCount;
+                    hitData.redMission = nextMission;
+                }
+
+                hitData.updatedAt = Date.now();
+                await syncStateUpdate(hitData);
+            }, 1400);
+
+            nextData.updatedAt = Date.now();
+            await syncStateUpdate(nextData);
+        };
+
+        function activateSmokeCover() {
+            smokeWipesRemaining = 5;
+            document.getElementById('smoke-wipe-count').innerText = smokeWipesRemaining;
+            document.getElementById('smoke-overlay').classList.remove('hidden');
+            sfx.error();
+        }
+
+        window.cleanSmoke = function() {
+            smokeWipesRemaining--;
+            document.getElementById('smoke-wipe-count').innerText = smokeWipesRemaining;
+            sfx.playTone(320, 'triangle', 0.1, 0.15);
+            if (smokeWipesRemaining <= 0) {
+                document.getElementById('smoke-overlay').classList.add('hidden');
+                sfx.success();
+            }
+        };
+
+        function showStepFeedback(text, isError) {
+            const el = document.getElementById('battle-feedback');
+            el.innerText = text;
+            el.className = isError 
+                ? "text-sm font-bold text-rose-400 min-h-[24px] mt-2 animate-pulse" 
+                : "text-sm font-bold text-emerald-400 min-h-[24px] mt-2";
+        }
+
+        window.sendQuickCheer = function(text) {
+            showStepFeedback(`📻 [포병 무전] ${text}`, false);
+            sfx.playTone(550, 'sine', 0.12, 0.2);
+        };
+
+        window.showCustomModal = function(title, msg) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = msg;
+            document.getElementById('custom-modal').classList.remove('hidden');
+        };
+
+        window.closeCustomModal = function() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        };
+
+        function triggerGrandVictory(winnerTeam, roomData) {
+            sfx.victoryFanfare();
+            const isBlueWin = winnerTeam === 'blue';
+            const winnerName = isBlueWin ? "🔵 알파 요새 포대" : "🔴 브라보 요새 포대";
+            const rawMembers = isBlueWin ? roomData.blueMembers : roomData.redMembers;
+            const members = (rawMembers || []).map(m => m.name || m);
+
+            document.getElementById('victory-team-title').innerText = `${winnerName} 포격전 대승리!`;
+            document.getElementById('victory-members-list').innerText = members.length > 0 ? members.join(', ') : '단독 포병관';
+            document.getElementById('victory-total-time').innerText = `${((Date.now() - missionStartTime) / 1000).toFixed(1)}초`;
+
+            setTimeout(() => {
+                document.getElementById('victory-modal').classList.remove('hidden');
+            }, 1400);
+        }
+
+        // ==========================================
+        // 🚀 SPECTACULAR PARABOLIC 2D CANVAS ENGINE
+        // ==========================================
+        let canvas, ctx;
+        let tacticalPings = [];
+        let ballisticProjectiles = [];
+        let explosions = [];
+
+        function initBallisticCanvas() {
+            canvas = document.getElementById('ballistic-canvas');
+            ctx = canvas.getContext('2d');
+            resizeBallisticCanvas();
+            window.addEventListener('resize', resizeBallisticCanvas);
+
+            canvas.addEventListener('click', handleCanvasPing);
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches[0]) {
+                    const touch = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    triggerPingFromCoords(touch.clientX - rect.left, touch.clientY - rect.top);
+                }
+            });
+
+            requestAnimationFrame(renderBallisticLoop);
+        }
+
+        function resizeBallisticCanvas() {
+            if (!canvas || !canvas.parentElement) return;
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+
+        function handleCanvasPing(e) {
+            const rect = canvas.getBoundingClientRect();
+            triggerPingFromCoords(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function triggerPingFromCoords(cx, cy) {
+            sfx.tacticalPing();
+            addTacticalPing(cx, cy, currentUserName || '포병관');
+
+            if (lastKnownRoomData) {
+                const pingData = { ...lastKnownRoomData };
+                pingData.lastPing = {
+                    team: myTeam,
+                    x: Math.round(cx),
+                    y: Math.round(cy),
+                    sender: currentUserName || '포병관',
+                    id: Date.now() + Math.random()
+                };
+                syncStateUpdate(pingData);
+            }
+        }
+
+        function addTacticalPing(x, y, sender) {
+            tacticalPings.push({
+                x: x,
+                y: y,
+                sender: sender,
+                radius: 6,
+                maxRadius: 40,
+                alpha: 1
+            });
+        }
+
+        function triggerArtilleryParabola(fromTeam, mission, payloadType) {
+            ballisticProjectiles.push({
+                fromTeam: fromTeam,
+                mission: mission,
+                payloadType: payloadType,
+                progress: 0
+            });
+        }
+
+        function triggerFortExplosion(victimTeam) {
+            const targetX = victimTeam === 'red' ? (canvas.width - 85) : 85;
+            const targetY = canvas.height - 45;
+
+            for (let i = 0; i < 50; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 7 + 2;
+                explosions.push({
+                    x: targetX,
+                    y: targetY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 4 + 2,
+                    color: victimTeam === 'red' ? '#fb7185' : '#34d399',
+                    alpha: 1
+                });
+            }
+        }
+
+        function renderBallisticLoop() {
+            if (!ctx || !canvas) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const groundY = h - 35;
+
+            // 1. Military Grid Coordinate Background
+            ctx.fillStyle = '#020b08';
+            ctx.fillRect(0, 0, w, h);
+
+            // Radar Grid lines
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < w; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, groundY);
+                ctx.stroke();
+            }
+            for (let y = 0; y < groundY; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            // Terrain Ground Surface
+            ctx.fillStyle = '#062017';
+            ctx.fillRect(0, groundY, w, 35);
+            ctx.strokeStyle = '#059669';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(w, groundY);
+            ctx.stroke();
+
+            // Distance ticks on ground
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.fillStyle = 'rgba(52, 211, 153, 0.6)';
+            ctx.textAlign = 'center';
+            for (let x = 40; x < w; x += 80) {
+                ctx.fillText(`${x}m`, x, groundY + 16);
+            }
+
+            // 2. Draw Active Team Parabola Trajectory Guide Lines
+            if (lastKnownRoomData) {
+                const data = lastKnownRoomData;
+                const mission = myTeam === 'blue' ? data.blueMission : data.redMission;
+                const currentStage = myTeam === 'blue' ? (data.blueStage || 0) : (data.redStage || 0);
+                drawActiveTrajectoryGuide(myTeam, mission, currentStage, groundY);
+            }
+
+            // 3. Draw Fortress Artillery Bunkers
+            const blueHp = lastKnownRoomData ? lastKnownRoomData.blueHp : 100;
+            const redHp = lastKnownRoomData ? lastKnownRoomData.redHp : 100;
+            drawFortressBunker(85, groundY, 'blue', blueHp);
+            drawFortressBunker(w - 85, groundY, 'red', redHp);
+
+            // 4. Parabolic Flight Simulation (y = a(x - p)^2 + q trajectory)
+            for (let i = ballisticProjectiles.length - 1; i >= 0; i--) {
+                const b = ballisticProjectiles[i];
+                b.progress += 0.024;
+
+                const isBlue = b.fromTeam === 'blue';
+                const startX = isBlue ? 85 : (w - 85);
+                const endX = isBlue ? (w - 85) : 85;
+
+                // Current X on the canvas
+                const curX = startX + (endX - startX) * b.progress;
+
+                // Parabola apex height mapping (q scale)
+                const apexHeight = Math.min(h * 0.75, Math.max(80, (b.mission ? b.mission.q * 14 : 140)));
+                // Normalized curve: sin(progress * PI) gives a perfect parabola arch
+                const curY = groundY - Math.sin(b.progress * Math.PI) * apexHeight;
+
+                ctx.save();
+                const warheadColor = b.payloadType === 'smoke_shell' ? '#f59e0b' : (b.payloadType === 'fort_repair' ? '#34d399' : '#fb7185');
+                ctx.strokeStyle = warheadColor;
+                ctx.fillStyle = warheadColor;
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = warheadColor;
+
+                // Rocket Body & Glow
+                ctx.beginPath();
+                ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Rocket Flame Tail Particles
+                for (let t = 0; t < 2; t++) {
+                    explosions.push({
+                        x: curX + (Math.random() - 0.5) * 6,
+                        y: curY + (Math.random() - 0.5) * 6,
+                        vx: (isBlue ? -1 : 1) * (Math.random() * 2 + 1),
+                        vy: (Math.random() - 0.5) * 2,
+                        radius: Math.random() * 3 + 1.5,
+                        color: '#fef08a',
+                        alpha: 0.8
+                    });
+                }
+                ctx.restore();
+
+                if (b.progress >= 1) {
+                    ballisticProjectiles.splice(i, 1);
+                }
+            }
+
+            // 5. Tactical Pings
+            for (let i = tacticalPings.length - 1; i >= 0; i--) {
+                const p = tacticalPings[i];
+                p.radius += 0.9;
+                p.alpha -= 0.025;
+
+                ctx.save();
+                ctx.strokeStyle = `rgba(250, 204, 21, ${p.alpha})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = `rgba(254, 240, 138, ${p.alpha})`;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`📍 ${p.sender}`, p.x, p.y - p.radius - 4);
+                ctx.restore();
+
+                if (p.alpha <= 0) tacticalPings.splice(i, 1);
+            }
+
+            // 6. Explosion & Smoke Particles
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const exp = explosions[i];
+                exp.x += exp.vx;
+                exp.y += exp.vy;
+                exp.alpha -= 0.032;
+
+                ctx.save();
+                ctx.globalAlpha = exp.alpha;
+                ctx.fillStyle = exp.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = exp.color;
+                ctx.beginPath();
+                ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (exp.alpha <= 0) explosions.splice(i, 1);
+            }
+
+            requestAnimationFrame(renderBallisticLoop);
+        }
+
+        // Draw live quadratic parabola guide lines according to unlocked stages
+        function drawActiveTrajectoryGuide(team, mission, currentStage, groundY) {
+            if (!mission) return;
+            const w = canvas.width;
+            const h = canvas.height;
+            const isBlue = team === 'blue';
+            const startX = isBlue ? 85 : (w - 85);
+            const targetX = isBlue ? (w - 85) : 85;
+
+            ctx.save();
+
+            // Stage 0: Draw Apex Guideline (대칭축 x = p & 최고고도 q)
+            const apexCanvasX = startX + (targetX - startX) * 0.5;
+            const apexHeight = Math.min(h * 0.75, Math.max(80, mission.q * 14));
+            const apexCanvasY = groundY - apexHeight;
+
+            if (currentStage >= 1) {
+                // Dashed vertical axis of symmetry
+                ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(apexCanvasX, groundY);
+                ctx.lineTo(apexCanvasX, apexCanvasY);
+                ctx.stroke();
+
+                // Apex point
+                ctx.fillStyle = '#facc15';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#facc15';
+                ctx.beginPath();
+                ctx.arc(apexCanvasX, apexCanvasY, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                ctx.fillStyle = '#fef08a';
+                ctx.textAlign = 'center';
+                ctx.fillText(`꼭짓점 (${mission.p}, ${mission.q})`, apexCanvasX, apexCanvasY - 10);
+            }
+
+            // Stage 1: Draw Glowing Parabola Curve
+            if (currentStage >= 2) {
+                ctx.strokeStyle = isBlue ? '#34d399' : '#f59e0b';
+                ctx.lineWidth = 2.5;
+                ctx.shadowBlur = 14;
+                ctx.shadowColor = isBlue ? '#10b981' : '#f59e0b';
+                ctx.setLineDash([8, 4]);
+
+                ctx.beginPath();
+                const steps = 60;
+                for (let s = 0; s <= steps; s++) {
+                    const prog = s / steps;
+                    const px = startX + (targetX - startX) * prog;
+                    const py = groundY - Math.sin(prog * Math.PI) * apexHeight;
+                    if (s === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Stage 2: Draw Target Intercept Lock Marker
+            if (currentStage >= 3) {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2.5;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(targetX, groundY, 14, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(targetX - 20, groundY);
+                ctx.lineTo(targetX + 20, groundY);
+                ctx.moveTo(targetX, groundY - 20);
+                ctx.lineTo(targetX, groundY + 20);
+                ctx.stroke();
+
+                ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                ctx.fillStyle = '#fca5a5';
+                ctx.textAlign = 'center';
+                ctx.fillText(`착탄점 x = ${mission.impactX}`, targetX, groundY - 24);
+            }
+
+            ctx.restore();
+        }
+
+        function drawFortressBunker(x, groundY, team, hp) {
+            const isBlue = team === 'blue';
+            const color = isBlue ? '#34d399' : '#fb7185';
+            const name = isBlue ? '알파 요새' : '브라보 요새';
+
+            ctx.save();
+            ctx.translate(x, groundY);
+
+            // Bunker Concrete Base
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.5;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.moveTo(-35, 0);
+            ctx.lineTo(-26, -26);
+            ctx.lineTo(26, -26);
+            ctx.lineTo(35, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Artillery Cannon Barrel
+            ctx.save();
+            ctx.translate(0, -18);
+            ctx.rotate(isBlue ? -Math.PI / 4.5 : Math.PI / 4.5);
+            ctx.fillStyle = '#334155';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.fillRect(0, -5, isBlue ? 32 : -32, 10);
+            ctx.strokeRect(0, -5, isBlue ? 32 : -32, 10);
+            ctx.restore();
+
+            // Bunker Turret Dome
+            ctx.fillStyle = '#1e293b';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, -18, 14, Math.PI, 0, false);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Status HP Label
+            ctx.font = 'bold 11px "JetBrains Mono", monospace';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${name} [${hp}%]`, 0, -42);
+
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>
