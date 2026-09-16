@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>파라볼라 스트라이크: 2차함수 탄도 포격전 - 중3 수학 4인 실시간 협동 배틀</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
     
@@ -87,7 +88,7 @@
         </div>
         <div class="flex items-center gap-3">
             <span class="text-yellow-300 font-bold">FIRE_CONTROL: LOCKED</span>
-            <span class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300">GRID_SECURE</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300">CLOUD_SECURE</span>
         </div>
     </div>
 
@@ -169,7 +170,7 @@
             </div>
             
             <div class="mt-5 text-center text-xs text-teal-300 font-mono-code font-bold">
-                🔥 클라우드 DB 연결 상태: <span id="db-status-badge">확인 중...</span>
+                🔥 클라우드 DB 연결 상태: <span id="db-status-badge">인증 및 연결 준비 중...</span>
             </div>
         </div>
 
@@ -590,42 +591,68 @@
         const sfx = new SoundFX();
     </script>
 
-    <!-- Main Game Logic and Firebase Synchronizer -->
+    <!-- Main Game Logic and Firebase Synchronizer with Full Auth & Strict Path -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { initializeFirestore, memoryLocalCache, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyChxrOzoTxFMy_BvkvNZLXAp1oRvN7Fb1g",
-            authDomain: "focus-tower-defense.firebaseapp.com",
-            projectId: "focus-tower-defense",
-            storageBucket: "focus-tower-defense.firebasestorage.app",
-            messagingSenderId: "519329169002",
-            appId: "1:519329169002:web:401534fe04b6ad39131413",
-            measurementId: "G-G2JRKQ2KXY"
-        };
+        // Global environment variables with robust fallback
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'parabola-strike-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined'
+            ? JSON.parse(__firebase_config)
+            : {
+                apiKey: "AIzaSyChxrOzoTxFMy_BvkvNZLXAp1oRvN7Fb1g",
+                authDomain: "focus-tower-defense.firebaseapp.com",
+                projectId: "focus-tower-defense",
+                storageBucket: "focus-tower-defense.firebasestorage.app",
+                messagingSenderId: "519329169002",
+                appId: "1:519329169002:web:401534fe04b6ad39131413",
+                measurementId: "G-G2JRKQ2KXY"
+            };
 
         let db = null;
-        let useFallback = false;
+        let auth = null;
+        let currentUser = null;
+        let isAuthReady = false;
 
         try {
             const app = initializeApp(firebaseConfig);
-            db = initializeFirestore(app, {
-                localCache: memoryLocalCache()
-            });
-            const badge = document.getElementById('db-status-badge');
-            if (badge) {
-                badge.innerText = "🟢 클라우드 DB 정상 연결!";
-                badge.className = "text-emerald-400 font-bold font-mono-code";
-            }
+            auth = getAuth(app);
+            db = getFirestore(app);
         } catch (e) {
-            useFallback = false;
-            const badge = document.getElementById('db-status-badge');
-            if (badge) {
-                badge.innerText = "🟢 클라우드 DB 연결 (직접 모드)";
-                badge.className = "text-emerald-400 font-bold font-mono-code";
-            }
+            console.error("Firebase init error:", e);
         }
+
+        // Complete Authentication FIRST before any query (Mandatory Rule 3)
+        const authReadyPromise = (async () => {
+            if (!auth) return null;
+            try {
+                let cred = null;
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    cred = await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    cred = await signInAnonymously(auth);
+                }
+                currentUser = cred.user;
+                isAuthReady = true;
+
+                const badge = document.getElementById('db-status-badge');
+                if (badge) {
+                    badge.innerText = `🟢 클라우드 통신망 정상 연결 (${currentUser.uid.substring(0, 6)}...)`;
+                    badge.className = "text-emerald-400 font-bold font-mono-code";
+                }
+                return currentUser;
+            } catch (err) {
+                console.warn("Auth initial error:", err);
+                const badge = document.getElementById('db-status-badge');
+                if (badge) {
+                    badge.innerText = "🟡 로컬 직통 연결 모드 활성";
+                    badge.className = "text-amber-300 font-bold font-mono-code";
+                }
+                return null;
+            }
+        })();
 
         let currentUserName = '';
         let currentRoomCode = '';
@@ -644,9 +671,15 @@
         let lockoutTimerInterval = null;
         const recentProblemsSet = new Set();
         let smokeWipesRemaining = 5;
-
-        // Double-click lock flag
         let isActionProcessing = false;
+        let lastRenderedStage = -1;
+        let lastRenderedTarget = -1;
+
+        // Strict Path Generator (Rule 1)
+        function getRoomDocRef(roomCode) {
+            if (!db) return null;
+            return doc(db, 'artifacts', appId, 'public', 'data', 'parabola_strike_rooms', roomCode);
+        }
 
         function generateParabolaMission(opIndex = 1) {
             let mission = null;
@@ -757,7 +790,6 @@
             }, 100);
         }
 
-        // Clean member list: Deduplicate and sort chronologically
         function cleanMemberList(members = []) {
             const map = new Map();
             members.forEach(item => {
@@ -820,25 +852,6 @@
             };
         }
 
-        function handlePeerJoin(newMember, team) {
-            if (!lastKnownRoomData) return;
-            const listKey = team === 'blue' ? 'blueMembers' : 'redMembers';
-            let currentList = lastKnownRoomData[listKey] || [];
-            if (!currentList.some(m => m.id === newMember.id)) {
-                currentList.push(newMember);
-                lastKnownRoomData[listKey] = cleanMemberList(currentList);
-                lastKnownRoomData.updatedAt = Date.now();
-                applyRoomState(lastKnownRoomData);
-                
-                // Reply with full state sync so the new peer receives all game data
-                if (bc) {
-                    try {
-                        bc.postMessage({ type: 'SYNC_STATE', payload: lastKnownRoomData });
-                    } catch (e) {}
-                }
-            }
-        }
-
         window.joinTeam = async function(team) {
             const nameInput = document.getElementById('player-name');
             const codeInput = document.getElementById('room-code');
@@ -852,7 +865,7 @@
 
             const myMemberObj = { id: myPlayerId, name: currentUserName, lastSeen: Date.now(), joinedAt: myJoinedAt };
 
-            // 1. Setup BroadcastChannel with full SYNC_STATE and PEER_JOIN listeners
+            // Setup local BroadcastChannel
             try {
                 if (window.BroadcastChannel) {
                     if (bc) bc.close();
@@ -866,8 +879,6 @@
                             }
                         } else if (msg.type === 'SYNC_STATE' && msg.payload) {
                             applyRoomState(msg.payload);
-                        } else if (msg.type === 'PEER_JOIN' && msg.member && msg.team) {
-                            handlePeerJoin(msg.member, msg.team);
                         }
                     };
                 }
@@ -878,43 +889,40 @@
             initBallisticCanvas();
             sfx.radarPing();
 
-            // 2. Initialize default state
-            let initialData = createInitialRoomData();
-            if (team === 'blue') initialData.blueMembers = [myMemberObj];
-            else initialData.redMembers = [myMemberObj];
-            applyRoomState(initialData);
+            // Local fallback baseline state
+            let localData = createInitialRoomData();
+            if (team === 'blue') localData.blueMembers = [myMemberObj];
+            else localData.redMembers = [myMemberObj];
+            applyRoomState(localData);
 
-            // 3. Connect to Firestore & merge team members seamlessly
+            // Connect to Firestore through Strict Path & Auth
+            await authReadyPromise;
             try {
-                if (db) {
-                    const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
-                    startFirestoreListener(roomRef);
+                const roomDoc = getRoomDocRef(currentRoomCode);
+                if (roomDoc) {
+                    startFirestoreListener(roomDoc);
 
-                    const snap = await getDoc(roomRef);
+                    const snap = await getDoc(roomDoc);
                     let currentData = snap.exists() ? snap.data() : createInitialRoomData();
                     const listKey = team === 'blue' ? 'blueMembers' : 'redMembers';
                     let currentList = currentData[listKey] || [];
                     
-                    // Filter existing entry for this player session and append
-                    currentList = currentList.filter(m => m.id !== myPlayerId);
+                    currentList = currentList.filter(m => (m.id || m.name) !== myPlayerId);
                     currentList.push(myMemberObj);
                     currentData[listKey] = cleanMemberList(currentList);
                     currentData.updatedAt = Date.now();
 
-                    // Apply merged state immediately so all team members are visible
                     applyRoomState(currentData);
-                    await setDoc(roomRef, currentData, { merge: true });
+                    await setDoc(roomDoc, currentData, { merge: true });
 
-                    // Broadcast peer join event immediately
                     if (bc) {
                         try {
-                            bc.postMessage({ type: 'PEER_JOIN', member: myMemberObj, team: team });
                             bc.postMessage({ type: 'SYNC_STATE', payload: currentData });
                         } catch (e) {}
                     }
                 }
             } catch (err) {
-                console.warn("Parabola strike join error:", err);
+                console.error("Parabola strike join error:", err);
             }
 
             window.addEventListener('beforeunload', leaveRoomCleanup);
@@ -950,11 +958,12 @@
             initBallisticCanvas();
             sfx.victoryFanfare();
 
+            await authReadyPromise;
             try {
-                if (db) {
-                    const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
-                    startFirestoreListener(roomRef);
-                    const snap = await getDoc(roomRef);
+                const roomDoc = getRoomDocRef(currentRoomCode);
+                if (roomDoc) {
+                    startFirestoreListener(roomDoc);
+                    const snap = await getDoc(roomDoc);
                     if (snap.exists()) {
                         applyRoomState(snap.data());
                     } else {
@@ -969,13 +978,14 @@
         async function leaveRoomCleanup() {
             if (!currentRoomCode || !myTeam || myTeam === 'spectator' || !db) return;
             try {
-                const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
-                const snap = await getDoc(roomRef);
+                const roomDoc = getRoomDocRef(currentRoomCode);
+                if (!roomDoc) return;
+                const snap = await getDoc(roomDoc);
                 if (snap.exists()) {
                     const data = snap.data();
                     const listKey = myTeam === 'blue' ? 'blueMembers' : 'redMembers';
-                    const filtered = (data[listKey] || []).filter(m => m.id !== myPlayerId);
-                    await updateDoc(roomRef, { [listKey]: filtered, updatedAt: Date.now() });
+                    const filtered = (data[listKey] || []).filter(m => (m.id || m.name) !== myPlayerId);
+                    await updateDoc(roomDoc, { [listKey]: filtered, updatedAt: Date.now() });
                 }
             } catch (e) {}
         }
@@ -987,10 +997,11 @@
             if (myTeam === 'blue') fresh.blueMembers = [myMemberObj];
             else if (myTeam === 'red') fresh.redMembers = [myMemberObj];
 
+            await authReadyPromise;
             try {
-                if (db) {
-                    const roomRef = doc(db, 'parabola_strike_rooms', code);
-                    await setDoc(roomRef, fresh);
+                const roomDoc = getRoomDocRef(code);
+                if (roomDoc) {
+                    await setDoc(roomDoc, fresh);
                 }
             } catch (e) {}
             applyRoomState(fresh);
@@ -1002,9 +1013,9 @@
             showCustomModal("초기화 완료", "포병 배틀룸 포대원 명단과 벙커 HP가 깨끗하게 리셋되었습니다!");
         };
 
-        function startFirestoreListener(roomRef) {
+        function startFirestoreListener(roomDocRef) {
             if (unsubscribeRoom) unsubscribeRoom();
-            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+            unsubscribeRoom = onSnapshot(roomDocRef, (snap) => {
                 if (!snap.exists()) return;
                 applyRoomState(snap.data());
             }, (err) => {
@@ -1045,8 +1056,10 @@
 
             const bMembers = (data.blueMembers || []).map(m => m.name || m);
             const rMembers = (data.redMembers || []).map(m => m.name || m);
-            document.getElementById('blue-members').innerText = `포대원(${bMembers.length}명): ${bMembers.join(', ') || '대기 중'}`;
-            document.getElementById('red-members').innerText = `포대원(${rMembers.length}명): ${rMembers.join(', ') || '대기 중'}`;
+            const bMemEl = document.getElementById('blue-members');
+            const rMemEl = document.getElementById('red-members');
+            if (bMemEl) bMemEl.innerText = `포대원(${bMembers.length}명): ${bMembers.join(', ') || '대기 중'}`;
+            if (rMemEl) rMemEl.innerText = `포대원(${rMembers.length}명): ${rMembers.join(', ') || '대기 중'}`;
 
             updatePipelineUI(data);
 
@@ -1064,13 +1077,13 @@
                     bc.postMessage({ type: 'SYNC_STATE', payload: nextData });
                 } catch (e) {}
             }
-            if (!useFallback && db) {
-                try {
-                    const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
-                    await updateDoc(roomRef, nextData);
-                } catch (e) {
-                    useFallback = true;
+            try {
+                const roomDoc = getRoomDocRef(currentRoomCode);
+                if (roomDoc) {
+                    await updateDoc(roomDoc, nextData);
                 }
+            } catch (e) {
+                console.warn("Update sync warning:", e);
             }
         }
 
@@ -1173,7 +1186,6 @@
             const slotQ = document.getElementById('slot-q');
             const slotImpact = document.getElementById('slot-impact');
 
-            // Stage 0: Vertex (p, q)
             if (currentStage >= 1) {
                 slotP.innerHTML = `<span class="text-emerald-300 font-bold">${currentMission.p}</span>`;
                 slotP.className = "px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-400 text-emerald-300 font-bold shadow-[0_0_8px_#10b981]";
@@ -1186,7 +1198,6 @@
                 slotQ.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
-            // Stage 1: Curvature a
             if (currentStage >= 2) {
                 slotA.innerHTML = `<span class="text-yellow-300 font-bold">${currentMission.a}</span>`;
                 slotA.className = "px-2 py-0.5 rounded bg-amber-950/80 border border-yellow-400 text-yellow-300 font-bold shadow-[0_0_8px_#eab308]";
@@ -1195,7 +1206,6 @@
                 slotA.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
-            // Stage 2: Landing x-intercept
             if (currentStage >= 3) {
                 slotImpact.innerHTML = `<span class="text-teal-300 font-bold">탄착점 x = ${currentMission.impactX} (락온!)</span>`;
                 slotImpact.className = "px-2.5 py-1 rounded bg-teal-950 border-2 border-teal-400 text-teal-300 font-bold shadow-[0_0_12px_#14b8a6] animate-pulse";
@@ -1613,7 +1623,6 @@
             ctx.fillStyle = '#020b08';
             ctx.fillRect(0, 0, w, h);
 
-            // Radar Grid lines
             ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)';
             ctx.lineWidth = 1;
             for (let x = 0; x < w; x += 40) {
