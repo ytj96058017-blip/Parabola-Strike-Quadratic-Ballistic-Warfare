@@ -340,7 +340,7 @@
                                 <div id="spec-blue-actor" class="text-[11px] text-emerald-200 font-mono-code truncate">주자: 대기 중</div>
                             </div>
                             <div class="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/50">
-                                <div class="text-xs text-rose-300 font-bold font-military mb-1 flex items-center justify-between">
+                                <div class="text-xs text-amber-300 font-bold font-military mb-1 flex items-center justify-between">
                                     <span>🔴 브라보 포대 (레드)</span>
                                     <span id="spec-red-op" class="text-[10px] text-yellow-300 font-mono-code">미션 #1</span>
                                 </div>
@@ -362,8 +362,9 @@
                     </div>
 
                     <!-- Step 3 Fire Button (Opens Payload Modal) -->
+                    <!-- ★ [연타 방지 가드 1] id="fire-action-btn" 추가 -->
                     <div id="fire-payload-control" class="hidden flex flex-col items-center gap-2 w-full max-w-md">
-                        <button onclick="openPayloadModal()" class="w-full py-4 bg-gradient-to-r from-amber-500 via-rose-600 to-red-600 hover:from-amber-400 hover:to-rose-500 text-white font-military text-xl md:text-2xl rounded-2xl shadow-xl border-2 border-yellow-300 active:scale-95 transition animate-pulse flex items-center justify-center gap-2">
+                        <button id="fire-action-btn" onclick="openPayloadModal()" class="w-full py-4 bg-gradient-to-r from-amber-500 via-rose-600 to-red-600 hover:from-amber-400 hover:to-rose-500 text-white font-military text-xl md:text-2xl rounded-2xl shadow-xl border-2 border-yellow-300 active:scale-95 transition animate-pulse flex items-center justify-center gap-2">
                             <span>🚀</span><span>포물선 탄도 미사일 발사 (FIRE! 💥)</span>
                         </button>
                         <span class="text-xs text-amber-200 font-semibold font-mono-code">> 탄도 궤적 계산 완료! 전술 탄두를 선택하여 적 요새를 타격하세요!</span>
@@ -644,13 +645,9 @@
         const recentProblemsSet = new Set();
         let smokeWipesRemaining = 5;
 
-        /*
-           중3 수학 핵심 함수: 이차함수 탄도학 생성기
-           - y = a(x - p)^2 + q  (위로 볼록인 탄도학: a < 0, 주로 a = -1 또는 -2)
-           - 꼭짓점 (p, q): 최고 고도 도달 지점 (대칭축 x = p, 최고 높이 q)
-           - 탄착점(지면 y = 0): a(x - p)^2 + q = 0 ➔ (x - p)^2 = -q / a ➔ x = p ± √(-q / a)
-           - 발사대 원점 또는 전방에서 출발하여 적 기지(양의 x축 탄착점)에 도달하도록 자연수/정수 계수 설정
-        */
+        // ★ [연타 방지 가드 플래그] 4단계 페이로드 발사 중복 클릭 방지
+        let isActionProcessing = false;
+
         function generateParabolaMission(opIndex = 1) {
             let mission = null;
             let attempts = 0;
@@ -660,32 +657,26 @@
                 const aPool = [-1, -2];
                 const a = aPool[Math.floor(Math.random() * aPool.length)];
 
-                // Choose integer square root k: k = √(-q / a)
-                const k = Math.floor(Math.random() * 4) + 2; // k in 2, 3, 4, 5
-                const q = -a * (k * k); // q is positive, perfectly divisible
+                const k = Math.floor(Math.random() * 4) + 2;
+                const q = -a * (k * k);
 
-                // Axis p chosen so that start point p - k >= 0 and impact p + k is reasonable (<= 14)
-                const p = k + Math.floor(Math.random() * 4) + 1; // p in [k+1, k+4]
-                const impactX = p + k; // Right landing point (x-intercept)
-                const launchX = p - k; // Left origin point
+                const p = k + Math.floor(Math.random() * 4) + 1;
+                const impactX = p + k;
+                const launchX = p - k;
 
-                // Expanded Standard Form Expression
                 const pSignStr = p >= 0 ? `- ${p}` : `+ ${Math.abs(p)}`;
                 const aStr = a === -1 ? "-" : `${a}`;
                 const expr = `y = ${aStr}(x ${pSignStr})² + ${q}`;
 
-                // Step 0: Axis p or Max Height q
                 const askForP = Math.random() < 0.5;
                 const step0Ans = askForP ? p : q;
                 const step0Clue = askForP
                     ? `탄도 포물선 y = ${aStr}(x ${pSignStr})² + ${q} 의 최고 고도 도달 축인 [ 대칭축 x = p ] 의 값을 구하라!`
                     : `탄도 포물선 y = ${aStr}(x ${pSignStr})² + ${q} 의 [ 최고 도달 고도 q (꼭짓점의 y좌표) ] 를 구하라!`;
 
-                // Step 1: Curvature coefficient a
                 const step1Ans = a;
                 const step1Clue = `포구 화력 및 탄도 곡률을 결정하는 [ 최고차항 계수 a ] 의 값을 입력하라! (위로 볼록 곡률)`;
 
-                // Step 2: Impact point x (y = 0 landing point)
                 const step2Ans = impactX;
                 const step2Clue = `지면(y = 0)에 포탄이 탄착하는 지점인 [ x절편(더 먼 착탄점 x) ] 의 좌표를 구하라! (발사 시작점: x = ${launchX})`;
 
@@ -745,7 +736,6 @@
             const lockoutBox = document.getElementById('lockout-penalty-box');
             const timerEl = document.getElementById('lockout-timer-num');
             lockoutBox.classList.remove('hidden');
-
             timerEl.innerText = '5.0';
 
             if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
@@ -830,12 +820,15 @@
         }
 
         window.joinTeam = async function(team) {
-            const name = document.getElementById('player-name').value.trim() || `포병관_${Math.floor(Math.random()*900+100)}`;
-            const code = document.getElementById('room-code').value.trim() || 'strike301';
+            const nameInput = document.getElementById('player-name');
+            const codeInput = document.getElementById('room-code');
+            const name = (nameInput ? nameInput.value.trim() : '') || `포병관_${Math.floor(Math.random()*900+100)}`;
+            const code = (codeInput ? codeInput.value.trim() : '') || 'strike301';
 
             currentUserName = name;
             currentRoomCode = code;
             myTeam = team;
+            isActionProcessing = false;
 
             const myMemberObj = { id: myPlayerId, name: currentUserName, lastSeen: Date.now(), joinedAt: myJoinedAt };
 
@@ -847,7 +840,9 @@
                         const msg = event.data;
                         if (!msg) return;
                         if (msg.type === 'LOCAL_PING' && msg.team === myTeam) {
-                            addTacticalPing(msg.x, msg.y, msg.sender);
+                            addTacticalPingCoords(msg.x, msg.y, msg.sender);
+                        } else if (msg.type === 'SYNC_STATE' && msg.payload) {
+                            applyRoomState(msg.payload);
                         }
                     };
                 }
@@ -894,6 +889,7 @@
             currentUserName = '교사 중계석';
             currentRoomCode = code;
             myTeam = 'spectator';
+            isActionProcessing = false;
 
             try {
                 if (window.BroadcastChannel) {
@@ -903,7 +899,7 @@
                         const msg = event.data;
                         if (!msg) return;
                         if (msg.type === 'LOCAL_PING') {
-                            addTacticalPing(msg.x, msg.y, msg.sender);
+                            addTacticalPingCoords(msg.x, msg.y, msg.sender);
                         } else if (msg.type === 'SYNC_STATE' && msg.payload) {
                             applyRoomState(msg.payload);
                         }
@@ -993,7 +989,7 @@
             if (data.lastPing && (!window.lastObservedPingId || window.lastObservedPingId !== data.lastPing.id)) {
                 window.lastObservedPingId = data.lastPing.id;
                 if (myTeam === 'spectator' || data.lastPing.team === myTeam) {
-                    addTacticalPing(data.lastPing.x, data.lastPing.y, data.lastPing.sender);
+                    addTacticalPingCoords(data.lastPing.x, data.lastPing.y, data.lastPing.sender);
                 }
             }
 
@@ -1020,6 +1016,11 @@
 
         async function syncStateUpdate(nextData) {
             applyRoomState(nextData);
+            if (bc) {
+                try {
+                    bc.postMessage({ type: 'SYNC_STATE', payload: nextData });
+                } catch (e) {}
+            }
             if (!useFallback && db) {
                 try {
                     const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
@@ -1047,13 +1048,13 @@
             // Handle Spectator / Broadcaster View
             if (team === 'spectator') {
                 const specPanel = document.getElementById('spectator-broadcast-panel');
-                const numControls = document.getElementById('number-input-control');
-                const fireControls = document.getElementById('fire-payload-control');
+                const numControl = document.getElementById('number-input-control');
+                const fireControl = document.getElementById('fire-payload-control');
                 const waitingNotice = document.getElementById('waiting-notice');
 
                 if (specPanel) specPanel.classList.remove('hidden');
-                if (numControls) numControls.classList.add('hidden');
-                if (fireControls) fireControls.classList.add('hidden');
+                if (numControl) numControl.classList.add('hidden');
+                if (fireControl) fireControl.classList.add('hidden');
                 if (waitingNotice) waitingNotice.classList.add('hidden');
 
                 const teamBadge = document.getElementById('my-team-badge');
@@ -1106,8 +1107,9 @@
                 }
 
                 const activeMission = bHp >= rHp ? data.blueMission : data.redMission;
-                if (activeMission && document.getElementById('function-display')) {
-                    document.getElementById('function-display').innerText = activeMission.expr;
+                if (activeMission) {
+                    const eqEl = document.getElementById('function-display');
+                    if (eqEl) eqEl.innerText = activeMission.expr;
                 }
                 return;
             }
@@ -1129,7 +1131,6 @@
             const slotQ = document.getElementById('slot-q');
             const slotImpact = document.getElementById('slot-impact');
 
-            // Stage 0: Vertex (p, q)
             if (currentStage >= 1) {
                 slotP.innerHTML = `<span class="text-emerald-300 font-bold">${currentMission.p}</span>`;
                 slotP.className = "px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-400 text-emerald-300 font-bold shadow-[0_0_8px_#10b981]";
@@ -1142,7 +1143,6 @@
                 slotQ.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
-            // Stage 1: Curvature a
             if (currentStage >= 2) {
                 slotA.innerHTML = `<span class="text-yellow-300 font-bold">${currentMission.a}</span>`;
                 slotA.className = "px-2 py-0.5 rounded bg-amber-950/80 border border-yellow-400 text-yellow-300 font-bold shadow-[0_0_8px_#eab308]";
@@ -1151,7 +1151,6 @@
                 slotA.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
-            // Stage 2: Landing x-intercept
             if (currentStage >= 3) {
                 slotImpact.innerHTML = `<span class="text-teal-300 font-bold">탄착점 x = ${currentMission.impactX} (락온!)</span>`;
                 slotImpact.className = "px-2.5 py-1 rounded bg-teal-950 border-2 border-teal-400 text-teal-300 font-bold shadow-[0_0_12px_#14b8a6] animate-pulse";
@@ -1166,7 +1165,7 @@
                 teamBadge.className = 'text-xs px-3.5 py-1 bg-emerald-500/25 text-emerald-300 border border-emerald-400 rounded-full font-bold font-military';
             } else {
                 teamBadge.innerText = `🔴 BRAVO RED [MISSION #${problemCount}]`;
-                teamBadge.className = 'text-xs px-3.5 py-1 bg-rose-500/25 text-rose-300 border border-rose-400 rounded-full font-bold font-military';
+                teamBadge.className = 'text-xs px-3.5 py-1 bg-rose-500/25 text-rose-300 border border-rose-500/40 rounded-full font-bold font-military';
             }
 
             const teamSize = Math.max(1, myMembers.length);
@@ -1193,11 +1192,15 @@
             }
 
             const instEl = document.getElementById('step-instruction');
-            const numControls = document.getElementById('number-input-control');
-            const fireControls = document.getElementById('fire-payload-control');
+            const numControl = document.getElementById('number-input-control');
+            const fireControl = document.getElementById('fire-payload-control');
             const waitingNotice = document.getElementById('waiting-notice');
             const currentActorEl = document.getElementById('current-actor-name');
             const stepNumInput = document.getElementById('step-number-input');
+
+            const isStageChanged = (lastRenderedStage !== currentStage || lastRenderedTarget !== problemCount);
+            lastRenderedStage = currentStage;
+            lastRenderedTarget = problemCount;
 
             if (currentStage === 0) {
                 instEl.innerText = `【1단계: 꼭짓점/축 관측】 ${currentMission.step0Clue}`;
@@ -1212,19 +1215,21 @@
             if (isMyTurn) {
                 waitingNotice.classList.add('hidden');
                 if (currentStage === 3) {
-                    numControls.classList.add('hidden');
-                    fireControls.classList.remove('hidden');
+                    numControl.classList.add('hidden');
+                    fireControl.classList.remove('hidden');
                 } else {
-                    fireControls.classList.add('hidden');
-                    numControls.classList.remove('hidden');
+                    fireControl.classList.add('hidden');
+                    numControl.classList.remove('hidden');
                     stepNumInput.disabled = false;
-                    stepNumInput.value = '';
+                    if (isStageChanged) {
+                        stepNumInput.value = '';
+                        stepNumInput.focus();
+                    }
                     stepNumInput.placeholder = currentStage === 0 ? (currentMission.askForP ? "대칭축 p 값 입력" : "최고고도 q 값 입력") : (currentStage === 1 ? "곡률 계수 a 값 입력" : "탄착점 x좌표 입력");
-                    stepNumInput.focus();
                 }
             } else {
-                numControls.classList.add('hidden');
-                fireControls.classList.add('hidden');
+                numControl.classList.add('hidden');
+                fireControl.classList.add('hidden');
                 waitingNotice.classList.remove('hidden');
                 currentActorEl.innerText = `${activeMemberName} (${activeMemberIndex + 1}번 포병관)`;
             }
@@ -1260,7 +1265,8 @@
             if (isLockedOut) return;
             if (!lastKnownRoomData) return;
             const inputEl = document.getElementById('step-number-input');
-            const val = parseFloat(inputEl.value.trim());
+            const sanitized = inputEl.value.trim().replace(/[^0-9.-]/g, '');
+            const val = parseFloat(sanitized);
 
             if (isNaN(val)) {
                 showStepFeedback("숫자를 입력해 주세요!", true);
@@ -1300,12 +1306,28 @@
         };
 
         window.openPayloadModal = function() {
+            // ★ [연타 방지 가드 1] 이미 처리 중이면 모달 오픈 차단
+            if (isActionProcessing) return;
             document.getElementById('payload-modal').classList.remove('hidden');
         };
 
         window.choosePayload = async function(payloadType) {
+            // ★ [연타 방지 가드 2] 즉시 잠금 설정 및 버튼 비활성화
+            if (isActionProcessing) return;
+            isActionProcessing = true;
+
+            const fireActionBtn = document.getElementById('fire-action-btn');
+            if (fireActionBtn) {
+                fireActionBtn.disabled = true;
+                fireActionBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
             document.getElementById('payload-modal').classList.add('hidden');
-            if (!lastKnownRoomData) return;
+            if (!lastKnownRoomData) {
+                isActionProcessing = false;
+                return;
+            }
+
             const data = lastKnownRoomData;
             const enemyTeam = myTeam === 'blue' ? 'red' : 'blue';
             const mission = myTeam === 'blue' ? data.blueMission : data.redMission;
@@ -1366,6 +1388,7 @@
                 }
 
                 hitData.updatedAt = Date.now();
+                isActionProcessing = false;
                 await syncStateUpdate(hitData);
             }, 1400);
 
@@ -1392,6 +1415,7 @@
 
         function showStepFeedback(text, isError) {
             const el = document.getElementById('battle-feedback');
+            if (!el) return;
             el.innerText = text;
             el.className = isError 
                 ? "text-sm font-bold text-rose-400 min-h-[24px] mt-2 animate-pulse" 
@@ -1429,9 +1453,6 @@
             }, 1400);
         }
 
-        // ==========================================
-        // 🚀 SPECTACULAR PARABOLIC 2D CANVAS ENGINE
-        // ==========================================
         let canvas, ctx;
         let tacticalPings = [];
         let ballisticProjectiles = [];
@@ -1439,6 +1460,7 @@
 
         function initBallisticCanvas() {
             canvas = document.getElementById('ballistic-canvas');
+            if (!canvas) return;
             ctx = canvas.getContext('2d');
             resizeBallisticCanvas();
             window.addEventListener('resize', resizeBallisticCanvas);
@@ -1468,7 +1490,7 @@
 
         function triggerPingFromCoords(cx, cy) {
             sfx.tacticalPing();
-            addTacticalPing(cx, cy, currentUserName || '포병관');
+            addTacticalPingCoords(cx, cy, currentUserName || '포병관');
 
             if (bc) {
                 try {
@@ -1491,7 +1513,12 @@
             }
         }
 
-        function addTacticalPing(x, y, sender) {
+        function addTacticalPing(x, sender) {
+            const y = canvas ? canvas.height / 2 : 150;
+            addTacticalPingCoords(x, y, sender);
+        }
+
+        function addTacticalPingCoords(x, y, sender) {
             tacticalPings.push({
                 x: x,
                 y: y,
@@ -1538,11 +1565,9 @@
             const h = canvas.height;
             const groundY = h - 35;
 
-            // 1. Military Grid Coordinate Background
             ctx.fillStyle = '#020b08';
             ctx.fillRect(0, 0, w, h);
 
-            // Radar Grid lines
             ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)';
             ctx.lineWidth = 1;
             for (let x = 0; x < w; x += 40) {
@@ -1558,7 +1583,6 @@
                 ctx.stroke();
             }
 
-            // Terrain Ground Surface
             ctx.fillStyle = '#062017';
             ctx.fillRect(0, groundY, w, 35);
             ctx.strokeStyle = '#059669';
@@ -1568,7 +1592,6 @@
             ctx.lineTo(w, groundY);
             ctx.stroke();
 
-            // Distance ticks on ground
             ctx.font = '10px "JetBrains Mono", monospace';
             ctx.fillStyle = 'rgba(52, 211, 153, 0.6)';
             ctx.textAlign = 'center';
@@ -1576,7 +1599,6 @@
                 ctx.fillText(`${x}m`, x, groundY + 16);
             }
 
-            // 2. Draw Active Team Parabola Trajectory Guide Lines
             if (lastKnownRoomData) {
                 const data = lastKnownRoomData;
                 const mission = myTeam === 'spectator'
@@ -1588,13 +1610,11 @@
                 drawActiveTrajectoryGuide(myTeam, mission, currentStage, groundY);
             }
 
-            // 3. Draw Fortress Artillery Bunkers
             const blueHp = lastKnownRoomData ? lastKnownRoomData.blueHp : 100;
             const redHp = lastKnownRoomData ? lastKnownRoomData.redHp : 100;
             drawFortressBunker(85, groundY, 'blue', blueHp);
             drawFortressBunker(w - 85, groundY, 'red', redHp);
 
-            // 4. Parabolic Flight Simulation (y = a(x - p)^2 + q trajectory)
             for (let i = ballisticProjectiles.length - 1; i >= 0; i--) {
                 const b = ballisticProjectiles[i];
                 b.progress += 0.024;
@@ -1603,12 +1623,8 @@
                 const startX = isBlue ? 85 : (w - 85);
                 const endX = isBlue ? (w - 85) : 85;
 
-                // Current X on the canvas
                 const curX = startX + (endX - startX) * b.progress;
-
-                // Parabola apex height mapping (q scale)
                 const apexHeight = Math.min(h * 0.75, Math.max(80, (b.mission ? b.mission.q * 14 : 140)));
-                // Normalized curve: sin(progress * PI) gives a perfect parabola arch
                 const curY = groundY - Math.sin(b.progress * Math.PI) * apexHeight;
 
                 ctx.save();
@@ -1618,12 +1634,10 @@
                 ctx.shadowBlur = 18;
                 ctx.shadowColor = warheadColor;
 
-                // Rocket Body & Glow
                 ctx.beginPath();
                 ctx.arc(curX, curY, 6, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Rocket Flame Tail Particles
                 for (let t = 0; t < 2; t++) {
                     explosions.push({
                         x: curX + (Math.random() - 0.5) * 6,
@@ -1642,7 +1656,6 @@
                 }
             }
 
-            // 5. Tactical Pings
             for (let i = tacticalPings.length - 1; i >= 0; i--) {
                 const p = tacticalPings[i];
                 p.radius += 0.9;
@@ -1664,7 +1677,6 @@
                 if (p.alpha <= 0) tacticalPings.splice(i, 1);
             }
 
-            // 6. Explosion & Smoke Particles
             for (let i = explosions.length - 1; i >= 0; i--) {
                 const exp = explosions[i];
                 exp.x += exp.vx;
@@ -1687,7 +1699,6 @@
             requestAnimationFrame(renderBallisticLoop);
         }
 
-        // Draw live quadratic parabola guide lines according to unlocked stages
         function drawActiveTrajectoryGuide(team, mission, currentStage, groundY) {
             if (!mission) return;
             const w = canvas.width;
@@ -1698,13 +1709,11 @@
 
             ctx.save();
 
-            // Stage 0: Draw Apex Guideline (대칭축 x = p & 최고고도 q)
             const apexCanvasX = startX + (targetX - startX) * 0.5;
             const apexHeight = Math.min(h * 0.75, Math.max(80, mission.q * 14));
             const apexCanvasY = groundY - apexHeight;
 
             if (currentStage >= 1) {
-                // Dashed vertical axis of symmetry
                 ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([5, 5]);
@@ -1713,7 +1722,6 @@
                 ctx.lineTo(apexCanvasX, apexCanvasY);
                 ctx.stroke();
 
-                // Apex point
                 ctx.fillStyle = '#facc15';
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = '#facc15';
@@ -1727,7 +1735,6 @@
                 ctx.fillText(`꼭짓점 (${mission.p}, ${mission.q})`, apexCanvasX, apexCanvasY - 10);
             }
 
-            // Stage 1: Draw Glowing Parabola Curve
             if (currentStage >= 2) {
                 ctx.strokeStyle = isBlue ? '#34d399' : '#f59e0b';
                 ctx.lineWidth = 2.5;
@@ -1748,7 +1755,6 @@
                 ctx.setLineDash([]);
             }
 
-            // Stage 2: Draw Target Intercept Lock Marker
             if (currentStage >= 3) {
                 ctx.strokeStyle = '#ef4444';
                 ctx.lineWidth = 2.5;
@@ -1782,7 +1788,6 @@
             ctx.save();
             ctx.translate(x, groundY);
 
-            // Bunker Concrete Base
             ctx.fillStyle = '#0f172a';
             ctx.strokeStyle = color;
             ctx.lineWidth = 2.5;
@@ -1797,7 +1802,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Artillery Cannon Barrel
             ctx.save();
             ctx.translate(0, -18);
             ctx.rotate(isBlue ? -Math.PI / 4.5 : Math.PI / 4.5);
@@ -1808,7 +1812,6 @@
             ctx.strokeRect(0, -5, isBlue ? 32 : -32, 10);
             ctx.restore();
 
-            // Bunker Turret Dome
             ctx.fillStyle = '#1e293b';
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
@@ -1818,7 +1821,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Status HP Label
             ctx.font = 'bold 11px "JetBrains Mono", monospace';
             ctx.fillStyle = color;
             ctx.textAlign = 'center';
