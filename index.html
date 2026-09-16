@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>파라볼라 스트라이크: 2차함수 탄도 포격전 - 중3 수학 4인 실시간 협동 배틀</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
     
@@ -160,7 +159,7 @@
 
             <!-- Lobby Reset Button -->
             <div class="flex justify-center mb-4">
-                <button onclick="resetCurrentRoomData()" class="px-4 py-2 bg-rose-950/90 hover:bg-rose-900 border border-rose-500/70 rounded-xl text-xs text-rose-300 font-bold transition flex items-center gap-2 shadow font-mono-code">
+                <button onclick="resetCurrentRoomData()" class="px-4 py-2 bg-rose-950/90 hover:bg-rose-900 border border-rose-500/70 rounded-xl text-xs text-rose-300 font-bold transition flex items-center gap-2 shadow font-mono-code active:scale-95">
                     <span>🧹</span><span>로비 포대원 명단 초기화 (유령 정리)</span>
                 </button>
             </div>
@@ -362,7 +361,6 @@
                     </div>
 
                     <!-- Step 3 Fire Button (Opens Payload Modal) -->
-                    <!-- ★ [연타 방지 가드 1] id="fire-action-btn" 추가 -->
                     <div id="fire-payload-control" class="hidden flex flex-col items-center gap-2 w-full max-w-md">
                         <button id="fire-action-btn" onclick="openPayloadModal()" class="w-full py-4 bg-gradient-to-r from-amber-500 via-rose-600 to-red-600 hover:from-amber-400 hover:to-rose-500 text-white font-military text-xl md:text-2xl rounded-2xl shadow-xl border-2 border-yellow-300 active:scale-95 transition animate-pulse flex items-center justify-center gap-2">
                             <span>🚀</span><span>포물선 탄도 미사일 발사 (FIRE! 💥)</span>
@@ -595,7 +593,7 @@
     <!-- Main Game Logic and Firebase Synchronizer -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, memoryLocalCache, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyChxrOzoTxFMy_BvkvNZLXAp1oRvN7Fb1g",
@@ -612,7 +610,9 @@
 
         try {
             const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
+            db = initializeFirestore(app, {
+                localCache: memoryLocalCache()
+            });
             const badge = document.getElementById('db-status-badge');
             if (badge) {
                 badge.innerText = "🟢 클라우드 DB 정상 연결!";
@@ -645,7 +645,7 @@
         const recentProblemsSet = new Set();
         let smokeWipesRemaining = 5;
 
-        // ★ [연타 방지 가드 플래그] 4단계 페이로드 발사 중복 클릭 방지
+        // Double-click lock flag
         let isActionProcessing = false;
 
         function generateParabolaMission(opIndex = 1) {
@@ -757,11 +757,12 @@
             }, 100);
         }
 
+        // Clean member list: Deduplicate and sort chronologically
         function cleanMemberList(members = []) {
             const map = new Map();
             members.forEach(item => {
                 if (!item) return;
-                const id = item.id || item.name;
+                const id = item.id || (item.name + '_' + (item.joinedAt || Math.random()));
                 const name = item.name || item.id || '포병관';
                 const joinedAt = item.joinedAt || Date.now();
                 const lastSeen = item.lastSeen || Date.now();
@@ -819,6 +820,25 @@
             };
         }
 
+        function handlePeerJoin(newMember, team) {
+            if (!lastKnownRoomData) return;
+            const listKey = team === 'blue' ? 'blueMembers' : 'redMembers';
+            let currentList = lastKnownRoomData[listKey] || [];
+            if (!currentList.some(m => m.id === newMember.id)) {
+                currentList.push(newMember);
+                lastKnownRoomData[listKey] = cleanMemberList(currentList);
+                lastKnownRoomData.updatedAt = Date.now();
+                applyRoomState(lastKnownRoomData);
+                
+                // Reply with full state sync so the new peer receives all game data
+                if (bc) {
+                    try {
+                        bc.postMessage({ type: 'SYNC_STATE', payload: lastKnownRoomData });
+                    } catch (e) {}
+                }
+            }
+        }
+
         window.joinTeam = async function(team) {
             const nameInput = document.getElementById('player-name');
             const codeInput = document.getElementById('room-code');
@@ -832,6 +852,7 @@
 
             const myMemberObj = { id: myPlayerId, name: currentUserName, lastSeen: Date.now(), joinedAt: myJoinedAt };
 
+            // 1. Setup BroadcastChannel with full SYNC_STATE and PEER_JOIN listeners
             try {
                 if (window.BroadcastChannel) {
                     if (bc) bc.close();
@@ -839,10 +860,14 @@
                     bc.onmessage = (event) => {
                         const msg = event.data;
                         if (!msg) return;
-                        if (msg.type === 'LOCAL_PING' && msg.team === myTeam) {
-                            addTacticalPingCoords(msg.x, msg.y, msg.sender);
+                        if (msg.type === 'LOCAL_PING') {
+                            if (myTeam === 'spectator' || msg.team === myTeam) {
+                                addTacticalPingCoords(msg.x, msg.y, msg.sender);
+                            }
                         } else if (msg.type === 'SYNC_STATE' && msg.payload) {
                             applyRoomState(msg.payload);
+                        } else if (msg.type === 'PEER_JOIN' && msg.member && msg.team) {
+                            handlePeerJoin(msg.member, msg.team);
                         }
                     };
                 }
@@ -853,11 +878,13 @@
             initBallisticCanvas();
             sfx.radarPing();
 
+            // 2. Initialize default state
             let initialData = createInitialRoomData();
             if (team === 'blue') initialData.blueMembers = [myMemberObj];
             else initialData.redMembers = [myMemberObj];
             applyRoomState(initialData);
 
+            // 3. Connect to Firestore & merge team members seamlessly
             try {
                 if (db) {
                     const roomRef = doc(db, 'parabola_strike_rooms', currentRoomCode);
@@ -867,12 +894,24 @@
                     let currentData = snap.exists() ? snap.data() : createInitialRoomData();
                     const listKey = team === 'blue' ? 'blueMembers' : 'redMembers';
                     let currentList = currentData[listKey] || [];
-                    currentList = currentList.filter(m => (m.id || m.name) !== myPlayerId);
+                    
+                    // Filter existing entry for this player session and append
+                    currentList = currentList.filter(m => m.id !== myPlayerId);
                     currentList.push(myMemberObj);
                     currentData[listKey] = cleanMemberList(currentList);
                     currentData.updatedAt = Date.now();
 
+                    // Apply merged state immediately so all team members are visible
+                    applyRoomState(currentData);
                     await setDoc(roomRef, currentData, { merge: true });
+
+                    // Broadcast peer join event immediately
+                    if (bc) {
+                        try {
+                            bc.postMessage({ type: 'PEER_JOIN', member: myMemberObj, team: team });
+                            bc.postMessage({ type: 'SYNC_STATE', payload: currentData });
+                        } catch (e) {}
+                    }
                 }
             } catch (err) {
                 console.warn("Parabola strike join error:", err);
@@ -881,7 +920,6 @@
             window.addEventListener('beforeunload', leaveRoomCleanup);
         };
 
-        // Teacher Spectator / Broadcaster Entry Function
         window.joinSpectator = async function() {
             const codeInput = document.getElementById('room-code');
             const code = (codeInput ? codeInput.value.trim() : '') || 'strike301';
@@ -936,7 +974,7 @@
                 if (snap.exists()) {
                     const data = snap.data();
                     const listKey = myTeam === 'blue' ? 'blueMembers' : 'redMembers';
-                    const filtered = (data[listKey] || []).filter(m => (m.id || m.name) !== myPlayerId);
+                    const filtered = (data[listKey] || []).filter(m => m.id !== myPlayerId);
                     await updateDoc(roomRef, { [listKey]: filtered, updatedAt: Date.now() });
                 }
             } catch (e) {}
@@ -956,6 +994,11 @@
                 }
             } catch (e) {}
             applyRoomState(fresh);
+            if (bc) {
+                try {
+                    bc.postMessage({ type: 'SYNC_STATE', payload: fresh });
+                } catch (e) {}
+            }
             showCustomModal("초기화 완료", "포병 배틀룸 포대원 명단과 벙커 HP가 깨끗하게 리셋되었습니다!");
         };
 
@@ -1107,9 +1150,8 @@
                 }
 
                 const activeMission = bHp >= rHp ? data.blueMission : data.redMission;
-                if (activeMission) {
-                    const eqEl = document.getElementById('function-display');
-                    if (eqEl) eqEl.innerText = activeMission.expr;
+                if (activeMission && document.getElementById('function-display')) {
+                    document.getElementById('function-display').innerText = activeMission.expr;
                 }
                 return;
             }
@@ -1131,6 +1173,7 @@
             const slotQ = document.getElementById('slot-q');
             const slotImpact = document.getElementById('slot-impact');
 
+            // Stage 0: Vertex (p, q)
             if (currentStage >= 1) {
                 slotP.innerHTML = `<span class="text-emerald-300 font-bold">${currentMission.p}</span>`;
                 slotP.className = "px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-400 text-emerald-300 font-bold shadow-[0_0_8px_#10b981]";
@@ -1143,6 +1186,7 @@
                 slotQ.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
+            // Stage 1: Curvature a
             if (currentStage >= 2) {
                 slotA.innerHTML = `<span class="text-yellow-300 font-bold">${currentMission.a}</span>`;
                 slotA.className = "px-2 py-0.5 rounded bg-amber-950/80 border border-yellow-400 text-yellow-300 font-bold shadow-[0_0_8px_#eab308]";
@@ -1151,6 +1195,7 @@
                 slotA.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-400 font-bold";
             }
 
+            // Stage 2: Landing x-intercept
             if (currentStage >= 3) {
                 slotImpact.innerHTML = `<span class="text-teal-300 font-bold">탄착점 x = ${currentMission.impactX} (락온!)</span>`;
                 slotImpact.className = "px-2.5 py-1 rounded bg-teal-950 border-2 border-teal-400 text-teal-300 font-bold shadow-[0_0_12px_#14b8a6] animate-pulse";
@@ -1165,7 +1210,7 @@
                 teamBadge.className = 'text-xs px-3.5 py-1 bg-emerald-500/25 text-emerald-300 border border-emerald-400 rounded-full font-bold font-military';
             } else {
                 teamBadge.innerText = `🔴 BRAVO RED [MISSION #${problemCount}]`;
-                teamBadge.className = 'text-xs px-3.5 py-1 bg-rose-500/25 text-rose-300 border border-rose-500/40 rounded-full font-bold font-military';
+                teamBadge.className = 'text-xs px-3.5 py-1 bg-rose-500/25 text-rose-300 border border-rose-400 rounded-full font-bold font-military';
             }
 
             const teamSize = Math.max(1, myMembers.length);
@@ -1214,9 +1259,15 @@
 
             if (isMyTurn) {
                 waitingNotice.classList.add('hidden');
+                isActionProcessing = false;
                 if (currentStage === 3) {
                     numControl.classList.add('hidden');
                     fireControl.classList.remove('hidden');
+                    const fireActionBtn = document.getElementById('fire-action-btn');
+                    if (fireActionBtn) {
+                        fireActionBtn.disabled = false;
+                        fireActionBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
                 } else {
                     fireControl.classList.add('hidden');
                     numControl.classList.remove('hidden');
@@ -1306,13 +1357,11 @@
         };
 
         window.openPayloadModal = function() {
-            // ★ [연타 방지 가드 1] 이미 처리 중이면 모달 오픈 차단
             if (isActionProcessing) return;
             document.getElementById('payload-modal').classList.remove('hidden');
         };
 
         window.choosePayload = async function(payloadType) {
-            // ★ [연타 방지 가드 2] 즉시 잠금 설정 및 버튼 비활성화
             if (isActionProcessing) return;
             isActionProcessing = true;
 
@@ -1513,11 +1562,6 @@
             }
         }
 
-        function addTacticalPing(x, sender) {
-            const y = canvas ? canvas.height / 2 : 150;
-            addTacticalPingCoords(x, y, sender);
-        }
-
         function addTacticalPingCoords(x, y, sender) {
             tacticalPings.push({
                 x: x,
@@ -1565,9 +1609,11 @@
             const h = canvas.height;
             const groundY = h - 35;
 
+            // 1. Military Grid Coordinate Background
             ctx.fillStyle = '#020b08';
             ctx.fillRect(0, 0, w, h);
 
+            // Radar Grid lines
             ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)';
             ctx.lineWidth = 1;
             for (let x = 0; x < w; x += 40) {
@@ -1583,6 +1629,7 @@
                 ctx.stroke();
             }
 
+            // Terrain Ground Surface
             ctx.fillStyle = '#062017';
             ctx.fillRect(0, groundY, w, 35);
             ctx.strokeStyle = '#059669';
@@ -1592,6 +1639,7 @@
             ctx.lineTo(w, groundY);
             ctx.stroke();
 
+            // Distance ticks on ground
             ctx.font = '10px "JetBrains Mono", monospace';
             ctx.fillStyle = 'rgba(52, 211, 153, 0.6)';
             ctx.textAlign = 'center';
@@ -1599,6 +1647,7 @@
                 ctx.fillText(`${x}m`, x, groundY + 16);
             }
 
+            // 2. Draw Active Team Parabola Trajectory Guide Lines
             if (lastKnownRoomData) {
                 const data = lastKnownRoomData;
                 const mission = myTeam === 'spectator'
@@ -1610,11 +1659,13 @@
                 drawActiveTrajectoryGuide(myTeam, mission, currentStage, groundY);
             }
 
+            // 3. Draw Fortress Artillery Bunkers
             const blueHp = lastKnownRoomData ? lastKnownRoomData.blueHp : 100;
             const redHp = lastKnownRoomData ? lastKnownRoomData.redHp : 100;
             drawFortressBunker(85, groundY, 'blue', blueHp);
             drawFortressBunker(w - 85, groundY, 'red', redHp);
 
+            // 4. Parabolic Flight Simulation (y = a(x - p)^2 + q trajectory)
             for (let i = ballisticProjectiles.length - 1; i >= 0; i--) {
                 const b = ballisticProjectiles[i];
                 b.progress += 0.024;
@@ -1634,10 +1685,12 @@
                 ctx.shadowBlur = 18;
                 ctx.shadowColor = warheadColor;
 
+                // Rocket Body & Glow
                 ctx.beginPath();
                 ctx.arc(curX, curY, 6, 0, Math.PI * 2);
                 ctx.fill();
 
+                // Rocket Flame Tail Particles
                 for (let t = 0; t < 2; t++) {
                     explosions.push({
                         x: curX + (Math.random() - 0.5) * 6,
@@ -1656,6 +1709,7 @@
                 }
             }
 
+            // 5. Tactical Pings
             for (let i = tacticalPings.length - 1; i >= 0; i--) {
                 const p = tacticalPings[i];
                 p.radius += 0.9;
@@ -1677,6 +1731,7 @@
                 if (p.alpha <= 0) tacticalPings.splice(i, 1);
             }
 
+            // 6. Explosion & Smoke Particles
             for (let i = explosions.length - 1; i >= 0; i--) {
                 const exp = explosions[i];
                 exp.x += exp.vx;
@@ -1768,7 +1823,7 @@
                 ctx.moveTo(targetX - 20, groundY);
                 ctx.lineTo(targetX + 20, groundY);
                 ctx.moveTo(targetX, groundY - 20);
-                ctx.lineTo(targetX, groundY + 20);
+                ctx.lineTo(targetX + 20, groundY + 20);
                 ctx.stroke();
 
                 ctx.font = 'bold 11px "JetBrains Mono", monospace';
